@@ -259,6 +259,7 @@ export default function TemplatesPage() {
         linkedin: "",
         github: "",
         website: "",
+        about: "",
       },
       experiences: [{ id: 1, company: "", position: "", duration: "", bullets: [""] }],
       educations: [{ id: 1, institution: "", degree: "", duration: "", achievements: [""] }],

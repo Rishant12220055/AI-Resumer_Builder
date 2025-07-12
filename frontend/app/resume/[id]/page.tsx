@@ -107,7 +107,7 @@ export default function ResumeBuilder({ params }: { params: Promise<{ id: string
     if (!hasMounted) return
 
     // Check if user is logged in
-    const userData = localStorage.getItem("user")
+    const userData = localStorage.getItem("auth_user")
     if (!userData) {
       router.push("/auth/login")
       return
@@ -115,13 +115,20 @@ export default function ResumeBuilder({ params }: { params: Promise<{ id: string
 
     // Load resume data
     const savedResumes = localStorage.getItem("resumes")
+    console.log("Loading resumes from localStorage:", savedResumes)
+    console.log("Looking for resume with ID:", id)
+    
     if (savedResumes) {
       try {
         const resumes = JSON.parse(savedResumes)
+        console.log("Parsed resumes:", resumes)
         const currentResume = resumes.find((r: Resume) => r.id === Number.parseInt(id))
+        console.log("Found resume:", currentResume)
+        
         if (currentResume) {
           setResume(currentResume)
         } else {
+          console.log("Resume not found, redirecting to dashboard")
           router.push("/dashboard")
           return
         }
@@ -131,6 +138,7 @@ export default function ResumeBuilder({ params }: { params: Promise<{ id: string
         return
       }
     } else {
+      console.log("No resumes found in localStorage, redirecting to dashboard")
       router.push("/dashboard")
       return
     }
