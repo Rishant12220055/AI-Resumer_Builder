@@ -266,7 +266,11 @@ export default function Dashboard() {
                 </p>
               </div>
               <Button
-                onClick={handleCreateResume}
+                onClick={(e) => {
+                  e.preventDefault()
+                  console.log("Button clicked directly")
+                  handleCreateResume()
+                }}
                 className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/30 transition-all duration-300 group"
               >
                 <Plus className="w-5 h-5 mr-2 group-hover:scale-110 transition-transform" />
@@ -329,7 +333,11 @@ export default function Dashboard() {
                     Create your first professional resume to get started. Choose from our collection of beautiful templates.
                   </p>
                   <Button
-                    onClick={handleCreateResume}
+                    onClick={(e) => {
+                      e.preventDefault()
+                      console.log("Empty state button clicked directly")
+                      handleCreateResume()
+                    }}
                     className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/30 transition-all duration-300 group"
                   >
                     <Plus className="w-5 h-5 mr-2 group-hover:scale-110 transition-transform" />
