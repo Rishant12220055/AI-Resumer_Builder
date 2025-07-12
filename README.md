@@ -241,4 +241,4 @@ curl http://your-frontend-domain.com
 - [ ] Database credentials secured
 - [ ] OAuth redirect URIs updated
 - [ ] Firewall configured
-- [ ] Regular backups scheduled 
+- [ ] Regular backups scheduled
