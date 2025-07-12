@@ -5,7 +5,20 @@ const axios = require('axios');
 // POST /api/ai-suggest
 router.post('/', async (req, res) => {
   try {
-    const { company, position, duration, context, institution, degree, industry, projectName } = req.body;
+    const { company, position, duration, context, institution, degree, industry, projectName, name } = req.body;
+    
+    // Debug logging
+    console.log('AI Request received:', {
+      context,
+      company,
+      position,
+      duration,
+      institution,
+      degree,
+      industry,
+      projectName,
+      name
+    });
 
     // Validate required fields based on context
     if (context === 'resume_bullet_point' && (!company || !position)) {
@@ -17,6 +30,7 @@ router.post('/', async (req, res) => {
     }
     
     if (context === 'skills_suggestion' && !position) {
+      console.log('Skills suggestion validation failed - position missing:', { context, position });
       return res.status(400).json({ error: 'Position is required for skills suggestions' });
     }
     
@@ -26,6 +40,10 @@ router.post('/', async (req, res) => {
     
     if (context === 'certification_suggestion' && !position) {
       return res.status(400).json({ error: 'Position is required for certification suggestions' });
+    }
+    
+    if (context === 'about_me_description' && !position) {
+      return res.status(400).json({ error: 'Position is required for about me descriptions' });
     }
 
     // Check if Gemini API key is configured
@@ -129,6 +147,22 @@ Microsoft Certified: Azure Developer Associate
 PMP (Project Management Professional)`;
         break;
         
+      case 'about_me_description':
+        prompt = `Generate a professional "About Me" description for ${name || 'a professional'} who is a ${position}.
+
+Requirements:
+- Write a compelling professional summary (2-3 sentences)
+- Highlight key strengths and career goals
+- Make it relevant to the position and industry
+- Keep it concise but impactful (max 200 characters)
+- Focus on what makes this person unique and valuable
+
+Format: Return only the about me description, without extra formatting.
+
+Example format:
+Passionate software engineer with 5+ years of experience developing scalable web applications. Specialized in React, Node.js, and cloud technologies with a proven track record of delivering high-impact projects that improve user experience and business outcomes. Committed to continuous learning and staying current with emerging technologies.`;
+        break;
+        
       default:
         prompt = `Generate 3 professional resume bullet points for a ${position} position at ${company}${duration ? ` from ${duration}` : ''}. 
 
@@ -201,6 +235,9 @@ Format: Return only the 3 bullet points, one per line, without numbering or extr
     // Extract and clean the generated text
     let generatedText = response.data.candidates[0].content.parts[0].text.trim();
     
+    console.log('Raw AI generated text:', generatedText);
+    console.log('Context:', context);
+    
     // Process suggestions based on context
     let suggestions = [];
     
@@ -211,8 +248,8 @@ Format: Return only the 3 bullet points, one per line, without numbering or extr
         .map(skill => skill.trim())
         .filter(skill => skill.length > 0 && skill.length < 50)
         .slice(0, 15); // Limit to 15 skills
-    } else if (context === 'project_description') {
-      // For project descriptions, return the entire text as a single suggestion
+    } else if (context === 'project_description' || context === 'about_me_description') {
+      // For project descriptions and about me descriptions, return the entire text as a single suggestion
       suggestions = [generatedText.trim()];
     } else {
       // For other contexts, split by newlines and clean them
@@ -222,6 +259,9 @@ Format: Return only the 3 bullet points, one per line, without numbering or extr
         .filter(line => line.length > 0 && line.length < 150)
         .slice(0, 3);
     }
+
+    console.log('Processed suggestions:', suggestions);
+    console.log('Number of suggestions:', suggestions.length);
 
     // If AI didn't generate enough suggestions, return what we got
     if (suggestions.length === 0) {
