@@ -122,7 +122,14 @@ export default function Dashboard() {
   )
 
   const handleCreateResume = () => {
-    router.push("/templates")
+    console.log("Create New Resume button clicked")
+    console.log("Current router:", router)
+    try {
+      router.push("/templates")
+      console.log("Navigation initiated to /templates")
+    } catch (error) {
+      console.error("Navigation error:", error)
+    }
   }
 
   const handleEditResume = (resumeId: number) => {
