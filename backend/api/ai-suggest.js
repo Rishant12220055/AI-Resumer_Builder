@@ -105,10 +105,12 @@ Requirements:
 - Skills that would be valuable for this role
 - Include both entry-level and advanced skills
 
-Format: Return only the skills, comma-separated, without numbering or extra formatting.
+IMPORTANT: Return ONLY the skills separated by commas, with no additional text, numbering, or formatting.
 
 Example format:
-JavaScript, React, Node.js, Python, AWS, Docker, Git, Agile, Leadership, Problem Solving, Communication, Team Collaboration, Data Analysis, API Development`;
+JavaScript, React, Node.js, Python, AWS, Docker, Git, Agile, Leadership, Problem Solving, Communication, Team Collaboration, Data Analysis, API Development
+
+Do not include any introductory text like "Here are the skills:" or "Skills include:". Just return the comma-separated list.`;
         break;
         
       case 'project_description':
@@ -125,6 +127,24 @@ Format: Return only the project description, without extra formatting.
 
 Example format:
 Developed a full-stack e-commerce platform using React and Node.js, implementing user authentication, payment processing, and admin dashboard. Deployed on AWS with 99.9% uptime and 40% improvement in user engagement.`;
+        break;
+        
+      case 'project_technologies':
+        prompt = `Generate 5-8 relevant technologies for a "${projectName}" project for a ${position} position.
+
+Requirements:
+- Include frontend technologies (frameworks, libraries)
+- Include backend technologies (languages, databases, servers)
+- Include deployment and infrastructure tools
+- Include testing and development tools
+- Technologies should be relevant to the project type and position
+
+IMPORTANT: Return ONLY the technologies separated by commas, with no additional text, numbering, or formatting.
+
+Example format:
+React, Node.js, MongoDB, Express.js, AWS, Docker, Jest, Git
+
+Do not include any introductory text like "Technologies used:" or "Tech stack:". Just return the comma-separated list.`;
         break;
         
       case 'certification_suggestion':
@@ -242,15 +262,79 @@ Format: Return only the 3 bullet points, one per line, without numbering or extr
     let suggestions = [];
     
     if (context === 'skills_suggestion') {
-      // For skills, split by comma and clean each skill
-      suggestions = generatedText
-        .split(',')
+      // For skills, handle multiple possible formats
+      let skillsText = generatedText;
+      
+      // Remove common prefixes/suffixes that AI might add
+      skillsText = skillsText.replace(/^(Here are|Here's|Skills:|Technical skills:|Soft skills:|Relevant skills:)/i, '').trim();
+      skillsText = skillsText.replace(/^(and|also|additionally|furthermore|moreover)/i, '').trim();
+      
+      // Split by comma, semicolon, or newlines
+      let skills = skillsText
+        .split(/[,;\n]/)
         .map(skill => skill.trim())
         .filter(skill => skill.length > 0 && skill.length < 50)
-        .slice(0, 15); // Limit to 15 skills
+        .filter(skill => !skill.match(/^(and|also|additionally|furthermore|moreover)$/i));
+      
+      // If we got very few skills, try splitting by different delimiters
+      if (skills.length < 3) {
+        skills = skillsText
+          .split(/[,\s]+/)
+          .map(skill => skill.trim())
+          .filter(skill => skill.length > 0 && skill.length < 50)
+          .filter(skill => !skill.match(/^(and|also|additionally|furthermore|moreover)$/i));
+      }
+      
+      suggestions = skills.slice(0, 15); // Limit to 15 skills
+      
+      console.log('Skills processing debug:', {
+        originalText: generatedText,
+        cleanedText: skillsText,
+        skillsFound: skills.length,
+        finalSuggestions: suggestions
+      });
     } else if (context === 'project_description' || context === 'about_me_description') {
       // For project descriptions and about me descriptions, return the entire text as a single suggestion
-      suggestions = [generatedText.trim()];
+      let summary = generatedText.trim();
+      // Remove common prefixes that Gemini might add
+      summary = summary.replace(/^(About\s*Me:|Summary:|Professional Summary:|Personal Summary:)/i, '').trim();
+      // Optionally, limit to 2-3 sentences (split by period)
+      const sentences = summary.split('.').map(s => s.trim()).filter(Boolean);
+      summary = sentences.slice(0, 3).join('. ');
+      if (summary && !summary.endsWith('.')) summary += '.';
+      suggestions = [summary];
+    } else if (context === 'project_technologies') {
+      // For project technologies, handle multiple possible formats
+      let techText = generatedText;
+      
+      // Remove common prefixes/suffixes that AI might add
+      techText = techText.replace(/^(Technologies used:|Tech stack:|Technologies:|Tools used:)/i, '').trim();
+      techText = techText.replace(/^(and|also|additionally|furthermore|moreover)/i, '').trim();
+      
+      // Split by comma, semicolon, or newlines
+      let technologies = techText
+        .split(/[,;\n]/)
+        .map(tech => tech.trim())
+        .filter(tech => tech.length > 0 && tech.length < 50)
+        .filter(tech => !tech.match(/^(and|also|additionally|furthermore|moreover)$/i));
+      
+      // If we got very few technologies, try splitting by different delimiters
+      if (technologies.length < 3) {
+        technologies = techText
+          .split(/[,\s]+/)
+          .map(tech => tech.trim())
+          .filter(tech => tech.length > 0 && tech.length < 50)
+          .filter(tech => !tech.match(/^(and|also|additionally|furthermore|moreover)$/i));
+      }
+      
+      suggestions = technologies.slice(0, 8); // Limit to 8 technologies
+      
+      console.log('Project technologies processing debug:', {
+        originalText: generatedText,
+        cleanedText: techText,
+        technologiesFound: technologies.length,
+        finalSuggestions: suggestions
+      });
     } else {
       // For other contexts, split by newlines and clean them
       suggestions = generatedText

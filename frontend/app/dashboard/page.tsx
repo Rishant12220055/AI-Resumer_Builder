@@ -33,61 +33,12 @@ import {
   Zap,
   Crown,
   Palette,
-  LogOut,
   User,
-  Settings,
-  Building,
-  Code,
 } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
+import { api, Resume } from "@/lib/api"
+import { ProtectedRoute } from "@/components/protected-route"
 import { useToast } from "@/hooks/use-toast"
-import ProtectedRoute from "@/components/protected-route"
-
-interface Resume {
-  id: number
-  title: string
-  createdAt: string
-  updatedAt: string
-  template?: string
-  personalInfo: {
-    name: string
-    title: string
-    email: string
-    phone: string
-    location: string
-    linkedin: string
-    github: string
-    website: string
-  }
-  experiences: Array<{
-    id: number
-    company: string
-    position: string
-    duration: string
-    bullets: string[]
-  }>
-  educations: Array<{
-    id: number
-    institution: string
-    degree: string
-    duration: string
-    achievements: string[]
-  }>
-  skills: string[]
-  projects: Array<{
-    id: number
-    name: string
-    description: string
-    technologies: string[]
-    link?: string
-  }>
-  certifications: Array<{
-    id: number
-    name: string
-    issuer: string
-    date: string
-  }>
-}
 
 export default function Dashboard() {
   const router = useRouter()
@@ -97,87 +48,106 @@ export default function Dashboard() {
   const [searchTerm, setSearchTerm] = useState("")
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
   const [isVisible, setIsVisible] = useState(false)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Load resumes from localStorage
-    const savedResumes = localStorage.getItem("resumes")
-    if (savedResumes) {
+    const loadResumes = async () => {
       try {
-        const parsedResumes = JSON.parse(savedResumes)
-        setResumes(parsedResumes)
-      } catch (error) {
-        console.error("Error parsing resumes:", error)
-        setResumes([])
+        const fetchedResumes = await api.getResumes()
+        setResumes(fetchedResumes)
+      } catch (error: any) {
+        console.error("Error loading resumes:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load resumes. Please try again.",
+          variant: "destructive",
+        })
+      } finally {
+        setLoading(false)
+        setTimeout(() => setIsVisible(true), 100)
       }
     }
-
-    // Trigger animations
-    setTimeout(() => setIsVisible(true), 100)
-  }, [])
+    if (user) {
+      loadResumes()
+    }
+  }, [user, toast])
 
   const filteredResumes = resumes.filter(
     (resume) =>
       resume.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      resume.personalInfo.name.toLowerCase().includes(searchTerm.toLowerCase()),
+      (resume.personalInfo?.firstName?.toLowerCase() + ' ' + resume.personalInfo?.lastName?.toLowerCase()).includes(searchTerm.toLowerCase())
   )
 
-  const handleCreateResume = () => {
-    console.log("Create New Resume button clicked")
-    console.log("Current router:", router)
+  const handleCreateResume = async () => {
     try {
-      router.push("/templates")
-      console.log("Navigation initiated to /templates")
-    } catch (error) {
-      console.error("Navigation error:", error)
+      const newResume = await api.createResume({ title: "Untitled Resume" })
+      router.push(`/resume/${newResume._id}`)
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Failed to create resume.",
+        variant: "destructive",
+      })
     }
   }
 
-  const handleEditResume = (resumeId: number) => {
+  const handleEditResume = (resumeId: string) => {
     router.push(`/resume/${resumeId}`)
   }
 
-  const handleDuplicateResume = (resume: Resume) => {
-    const duplicatedResume = {
-      ...resume,
-      id: Date.now(),
-      title: `${resume.title} (Copy)`,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }
+  const handlePreviewResume = (resumeId: string) => {
+    router.push(`/resume/${resumeId}/preview`)
+  }
 
-    const updatedResumes = [...resumes, duplicatedResume]
-    setResumes(updatedResumes)
-    localStorage.setItem("resumes", JSON.stringify(updatedResumes))
-    
+  const handleDownloadResume = (resume: Resume) => {
+    // TODO: Implement PDF download functionality
     toast({
-      title: "Resume Duplicated",
-      description: "Your resume has been successfully duplicated.",
+      title: "Coming Soon",
+      description: "PDF download will be available soon!",
     })
   }
 
-  const handleDeleteResume = (resumeId: number) => {
-    const updatedResumes = resumes.filter((resume) => resume.id !== resumeId)
-    setResumes(updatedResumes)
-    localStorage.setItem("resumes", JSON.stringify(updatedResumes))
-    
-    toast({
-      title: "Resume Deleted",
-      description: "Your resume has been successfully deleted.",
-    })
+  const handleBrowseTemplates = () => {
+    // Route to the templates page
+    router.push('/templates')
+  }
+
+  const handleDuplicateResume = async (resume: Resume) => {
+    try {
+      const duplicated = await api.createResume({ title: `${resume.title} (Copy)`, template: resume.template })
+      toast({ title: "Resume duplicated!" })
+      setResumes((prev) => [...prev, duplicated])
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Failed to duplicate resume.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleDeleteResume = async (resumeId: string) => {
+    try {
+      await api.deleteResume(resumeId)
+      setResumes((prev) => prev.filter((r) => r._id !== resumeId))
+      toast({ title: "Resume deleted." })
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Failed to delete resume.",
+        variant: "destructive",
+      })
+    }
   }
 
   const handleLogout = async () => {
     try {
       await logout()
-      toast({
-        title: "Logged Out",
-        description: "You have been successfully logged out.",
-      })
       router.push("/auth/login")
-    } catch (error) {
+    } catch (error: any) {
       toast({
-        title: "Logout Error",
-        description: "There was an error logging out. Please try again.",
+        title: "Error",
+        description: "Failed to logout. Please try again.",
         variant: "destructive",
       })
     }
@@ -197,269 +167,382 @@ export default function Dashboard() {
     return templates[templateId || "professional"] || templates.professional
   }
 
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/50 flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto animate-pulse">
+            <Rocket className="w-8 h-8 text-white" />
+          </div>
+          <div className="space-y-2">
+            <div className="h-4 bg-slate-200 rounded w-32 mx-auto animate-pulse" />
+            <div className="h-3 bg-slate-200 rounded w-24 mx-auto animate-pulse" />
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/50">
-        {/* Header */}
-        <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-xl border-b border-slate-200/60 shadow-sm">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center py-4">
-              <div className="flex items-center space-x-4">
-                <Link href="/" className="flex items-center space-x-3 group">
-                  <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/25 group-hover:scale-110 transition-all duration-300">
-                    <Rocket className="w-5 h-5 text-white" />
-                  </div>
-                  <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-                    ResumeAI
-                  </span>
-                </Link>
-              </div>
+      {/* Header */}
+      <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-slate-200/60 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center py-4">
+            <div className="flex items-center space-x-4">
+              <Link href="/" className="flex items-center space-x-3">
+                <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/25">
+                  <Rocket className="w-5 h-5 text-white" />
+                </div>
+                <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+                  ResumeAI
+                </span>
+              </Link>
+            </div>
 
-              <div className="flex items-center space-x-4">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="flex items-center space-x-2 hover:bg-slate-100 transition-colors">
-                      <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-full flex items-center justify-center">
-                        <span className="text-white text-sm font-medium">
-                          {user?.name?.charAt(0).toUpperCase() || 'U'}
-                        </span>
-                      </div>
-                      <span className="font-medium text-slate-700">{user?.name || 'User'}</span>
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56">
-                    <Link href="/profile">
-                      <DropdownMenuItem className="flex items-center space-x-2 cursor-pointer">
-                        <User className="w-4 h-4" />
-                        <span>Profile & Settings</span>
-                      </DropdownMenuItem>
-                    </Link>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem 
-                      onClick={handleLogout} 
-                      className="flex items-center space-x-2 text-red-600 cursor-pointer hover:bg-red-50"
-                    >
-                      <LogOut className="w-4 h-4" />
-                      <span>Sign Out</span>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
+            <div className="flex items-center space-x-4">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="flex items-center space-x-2">
+                    <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-full flex items-center justify-center">
+                      <span className="text-white text-sm font-medium">{user.name.charAt(0).toUpperCase()}</span>
+                    </div>
+                    <span className="font-medium text-slate-700">{user.name}</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => router.push('/profile')}>
+                    <User className="w-4 h-4 mr-2" />
+                    Profile Settings
+                  </DropdownMenuItem>
+                  <DropdownMenuItem>Billing</DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleLogout} className="text-red-600">
+                    Sign Out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
-        </header>
+        </div>
+      </header>
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {/* Welcome Section */}
-          <div
-            className={`mb-8 transition-all duration-1000 ${
-              isVisible ? "animate-fade-in-up" : "opacity-0 translate-y-10"
-            }`}
-          >
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-6 lg:space-y-0">
-              <div>
-                <h1 className="text-3xl font-bold text-slate-900">
-                  Welcome back, {user?.name?.split(' ')[0] || 'User'}! 👋
-                </h1>
-                <p className="text-slate-600 mt-2">
-                  Ready to create your next professional resume? Choose a template and get started.
-                </p>
-              </div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Welcome Section */}
+        <div
+          className={`mb-8 transition-all duration-1000 ${
+            isVisible ? "animate-fade-in-up" : "opacity-0 translate-y-10"
+          }`}
+        >
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-6 lg:space-y-0">
+            <div>
+              <h1 className="text-3xl md:text-4xl font-bold text-slate-900 mb-2">Welcome back, {user.name}! 👋</h1>
+              <p className="text-lg text-slate-600">Ready to create your next professional resume?</p>
+            </div>
+
+            <div className="flex items-center space-x-4">
+              <Card className="border-0 shadow-lg bg-gradient-to-br from-blue-600 to-indigo-600 text-white">
+                <CardContent className="p-4 text-center">
+                  <div className="text-2xl font-bold">{resumes.length}</div>
+                  <div className="text-sm opacity-90">Total Resumes</div>
+                </CardContent>
+              </Card>
+              <Card className="border-0 shadow-lg bg-gradient-to-br from-green-500 to-emerald-600 text-white">
+                <CardContent className="p-4 text-center">
+                  <div className="text-2xl font-bold">
+                    {
+                      resumes.filter((r) => new Date(r.updatedAt || '1970-01-01') > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000))
+                        .length
+                    }
+                  </div>
+                  <div className="text-sm opacity-90">This Week</div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </div>
+
+        {/* Action Bar */}
+        <div
+          className={`mb-8 transition-all duration-1000 ${
+            isVisible ? "animate-fade-in-up animation-delay-200" : "opacity-0 translate-y-10"
+          }`}
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
+            <div className="flex items-center space-x-4">
               <Button
-                onClick={(e) => {
-                  e.preventDefault()
-                  console.log("Button clicked directly")
-                  handleCreateResume()
-                }}
-                className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/30 transition-all duration-300 group"
+                onClick={handleCreateResume}
+                className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/30 transition-all duration-300"
               >
-                <Plus className="w-5 h-5 mr-2 group-hover:scale-110 transition-transform" />
+                <Plus className="w-4 h-4 mr-2" />
                 Create New Resume
               </Button>
+              <Button 
+                onClick={handleBrowseTemplates}
+                variant="outline" 
+                className="border-slate-200 hover:border-blue-300 bg-transparent"
+              >
+                <Palette className="w-4 h-4 mr-2" />
+                Browse Templates
+              </Button>
             </div>
-          </div>
 
-          {/* Search and Filters */}
-          <div
-            className={`mb-6 transition-all duration-1000 delay-200 ${
-              isVisible ? "animate-fade-in-up" : "opacity-0 translate-y-10"
-            }`}
-          >
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
-              <div className="relative flex-1 max-w-md">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
+            <div className="flex items-center space-x-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <Input
                   placeholder="Search resumes..."
+                  className="pl-10 w-64 border-slate-200 focus:border-blue-500"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 border-slate-200 focus:border-blue-500"
                 />
               </div>
-              <div className="flex items-center space-x-2">
+
+              <div className="flex items-center space-x-1 bg-slate-100 rounded-lg p-1">
                 <Button
-                  variant={viewMode === "grid" ? "default" : "outline"}
+                  variant={viewMode === "grid" ? "default" : "ghost"}
                   size="sm"
                   onClick={() => setViewMode("grid")}
-                  className={viewMode === "grid" ? "bg-blue-600 hover:bg-blue-700" : "border-slate-300 hover:border-blue-300 bg-white"}
+                  className={viewMode === "grid" ? "bg-white shadow-sm" : ""}
                 >
                   <Grid3X3 className="w-4 h-4" />
                 </Button>
                 <Button
-                  variant={viewMode === "list" ? "default" : "outline"}
+                  variant={viewMode === "list" ? "default" : "ghost"}
                   size="sm"
                   onClick={() => setViewMode("list")}
-                  className={viewMode === "list" ? "bg-blue-600 hover:bg-blue-700" : "border-slate-300 hover:border-blue-300 bg-white"}
+                  className={viewMode === "list" ? "bg-white shadow-sm" : ""}
                 >
                   <List className="w-4 h-4" />
                 </Button>
               </div>
             </div>
           </div>
+        </div>
 
-          {/* Resumes Grid/List */}
-          <div
-            className={`transition-all duration-1000 delay-400 ${
-              isVisible ? "animate-fade-in-up" : "opacity-0 translate-y-10"
-            }`}
-          >
-            {filteredResumes.length === 0 ? (
-              <Card className="text-center py-16 border-slate-200/60 bg-white/80 backdrop-blur-sm">
-                <CardContent>
-                  <div className="w-20 h-20 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-blue-500/25">
-                    <FileText className="w-10 h-10 text-white" />
-                  </div>
-                  <h3 className="text-2xl font-bold text-slate-900 mb-3">No resumes yet</h3>
-                  <p className="text-slate-600 mb-8 max-w-md mx-auto">
-                    Create your first professional resume to get started. Choose from our collection of beautiful templates.
-                  </p>
-                  <Button
-                    onClick={(e) => {
-                      e.preventDefault()
-                      console.log("Empty state button clicked directly")
-                      handleCreateResume()
-                    }}
-                    className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/30 transition-all duration-300 group"
+        {/* Resumes Section */}
+        <div
+          className={`transition-all duration-1000 ${
+            isVisible ? "animate-fade-in-up animation-delay-400" : "opacity-0 translate-y-10"
+          }`}
+        >
+          {filteredResumes.length > 0 ? (
+            <div className={viewMode === "grid" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" : "space-y-4"}>
+              {filteredResumes.map((resume, index) => {
+                const templateInfo = getTemplateInfo(resume.template)
+                const IconComponent = templateInfo.icon
+
+                return viewMode === "grid" ? (
+                  <Card
+                    key={resume._id}
+                    className="group hover:shadow-2xl hover:shadow-blue-500/10 transition-all duration-500 border-0 shadow-lg hover:-translate-y-2 bg-white/80 backdrop-blur-sm animate-fade-in-up"
+                    style={{ animationDelay: `${index * 100}ms` }}
                   >
-                    <Plus className="w-5 h-5 mr-2 group-hover:scale-110 transition-transform" />
-                    Create Your First Resume
-                  </Button>
-                </CardContent>
-              </Card>
-            ) : (
-              <div
-                className={
-                  viewMode === "grid"
-                    ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-                    : "space-y-4"
-                }
-              >
-                {filteredResumes.map((resume) => {
-                  const templateInfo = getTemplateInfo(resume.template)
-                  return (
-                    <Card
-                      key={resume.id}
-                      className="group hover:shadow-xl hover:scale-[1.02] transition-all duration-300 border-slate-200/60 bg-white/80 backdrop-blur-sm cursor-pointer"
-                      onClick={() => handleEditResume(resume.id)}
-                    >
-                      <CardHeader className="pb-3">
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-center space-x-3">
-                            <div className={`w-12 h-12 ${templateInfo.color} rounded-xl flex items-center justify-center shadow-lg`}>
-                              <templateInfo.icon className="w-6 h-6 text-white" />
-                            </div>
-                            <div>
-                              <CardTitle className="text-lg font-semibold text-slate-900 group-hover:text-blue-600 transition-colors">
-                                {resume.title}
-                              </CardTitle>
-                              <p className="text-sm text-slate-500">
-                                {resume.personalInfo.name || "Untitled"}
-                              </p>
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between mb-3">
+                        <div
+                          className={`w-10 h-10 ${templateInfo.color} rounded-lg flex items-center justify-center shadow-lg`}
+                        >
+                          <IconComponent className="w-5 h-5 text-white" />
+                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <MoreHorizontal className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleEditResume(resume._id)}>
+                              <Edit className="w-4 h-4 mr-2" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleDuplicateResume(resume)}>
+                              <Copy className="w-4 h-4 mr-2" />
+                              Duplicate
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handlePreviewResume(resume._id)}>
+                              <Eye className="w-4 h-4 mr-2" />
+                              Preview
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleDownloadResume(resume)}>
+                              <Download className="w-4 h-4 mr-2" />
+                              Download
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => handleDeleteResume(resume._id)} className="text-red-600">
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+
+                      <CardTitle className="text-lg font-bold text-slate-900 group-hover:text-blue-600 transition-colors line-clamp-2">
+                        {resume.title}
+                      </CardTitle>
+
+                      <div className="flex items-center space-x-2">
+                        <Badge className="bg-blue-100 text-blue-700 text-xs">{templateInfo.name}</Badge>
+                        {resume.personalInfo?.firstName && resume.personalInfo?.lastName && (
+                          <Badge className="bg-slate-100 text-slate-600 text-xs">{resume.personalInfo.firstName} {resume.personalInfo.lastName}</Badge>
+                        )}
+                      </div>
+                    </CardHeader>
+
+                    <CardContent className="pt-0">
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between text-sm text-slate-500">
+                          <div className="flex items-center space-x-1">
+                            <Clock className="w-3 h-3" />
+                            <span>Updated {new Date(resume.updatedAt || '1970-01-01').toLocaleDateString()}</span>
+                          </div>
+                          <div className="flex items-center space-x-1">
+                            <FileText className="w-3 h-3" />
+                            <span>{(resume.experiences?.length ?? 0)} exp</span>
+                          </div>
+                        </div>
+
+                        <div className="flex space-x-2">
+                          <Button
+                            onClick={() => handleEditResume(resume._id)}
+                            className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg shadow-blue-500/25"
+                            size="sm"
+                          >
+                            <Edit className="w-4 h-4 mr-2" />
+                            Edit
+                          </Button>
+                          <Button
+                            onClick={() => handlePreviewResume(resume._id)}
+                            variant="outline"
+                            size="sm"
+                            className="border-slate-200 hover:border-blue-300 hover:bg-blue-50 bg-transparent"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <Card
+                    key={resume._id}
+                    className="group hover:shadow-lg transition-all duration-300 border-0 shadow-sm bg-white/80 backdrop-blur-sm"
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-4">
+                          <div
+                            className={`w-12 h-12 ${templateInfo.color} rounded-lg flex items-center justify-center shadow-lg`}
+                          >
+                            <IconComponent className="w-6 h-6 text-white" />
+                          </div>
+                          <div>
+                            <h3 className="text-lg font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
+                              {resume.title}
+                            </h3>
+                            <div className="flex items-center space-x-2 mt-1">
+                              <Badge className="bg-blue-100 text-blue-700 text-xs">{templateInfo.name}</Badge>
+                              {resume.personalInfo?.firstName && resume.personalInfo?.lastName && (
+                                <Badge className="bg-slate-100 text-slate-600 text-xs">
+                                  {resume.personalInfo.firstName} {resume.personalInfo.lastName}
+                                </Badge>
+                              )}
+                              <span className="text-sm text-slate-500">
+                                Updated {new Date(resume.updatedAt || '1970-01-01').toLocaleDateString()}
+                              </span>
                             </div>
                           </div>
+                        </div>
+
+                        <div className="flex items-center space-x-2">
+                          <Button
+                            onClick={() => handleEditResume(resume._id)}
+                            className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg shadow-blue-500/25"
+                            size="sm"
+                          >
+                            <Edit className="w-4 h-4 mr-2" />
+                            Edit
+                          </Button>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                className="opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-slate-100 hover:scale-110 p-2"
-                                onClick={(e) => e.stopPropagation()}
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="border-slate-200 hover:border-blue-300 bg-transparent"
                               >
-                                <MoreHorizontal className="w-4 h-4 text-slate-600" />
+                                <MoreHorizontal className="w-4 h-4" />
                               </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-48 shadow-lg border-slate-200">
-                              <DropdownMenuItem onClick={() => handleEditResume(resume.id)} className="cursor-pointer hover:bg-blue-50">
-                                <Edit className="w-4 h-4 mr-2 text-blue-600" />
-                                <span className="text-blue-700">Edit</span>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleDuplicateResume(resume)}>
+                                <Copy className="w-4 h-4 mr-2" />
+                                Duplicate
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleDuplicateResume(resume)} className="cursor-pointer hover:bg-green-50">
-                                <Copy className="w-4 h-4 mr-2 text-green-600" />
-                                <span className="text-green-700">Duplicate</span>
+                              <DropdownMenuItem onClick={() => handlePreviewResume(resume._id)}>
+                                <Eye className="w-4 h-4 mr-2" />
+                                Preview
                               </DropdownMenuItem>
-                              <DropdownMenuItem className="cursor-pointer hover:bg-purple-50">
-                                <Eye className="w-4 h-4 mr-2 text-purple-600" />
-                                <span className="text-purple-700">Preview</span>
-                              </DropdownMenuItem>
-                              <DropdownMenuItem className="cursor-pointer hover:bg-orange-50">
-                                <Download className="w-4 h-4 mr-2 text-orange-600" />
-                                <span className="text-orange-700">Download</span>
+                              <DropdownMenuItem onClick={() => handleDownloadResume(resume)}>
+                                <Download className="w-4 h-4 mr-2" />
+                                Download
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                onClick={() => handleDeleteResume(resume.id)}
-                                className="text-red-600 cursor-pointer hover:bg-red-50"
-                              >
+                              <DropdownMenuItem onClick={() => handleDeleteResume(resume._id)} className="text-red-600">
                                 <Trash2 className="w-4 h-4 mr-2" />
-                                <span>Delete</span>
+                                Delete
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </div>
-                      </CardHeader>
-                      <CardContent className="pt-0">
-                        <div className="space-y-4">
-                          <div className="flex items-center justify-between text-sm text-slate-500">
-                            <span className="flex items-center space-x-1">
-                              <Clock className="w-4 h-4" />
-                              <span>Updated {new Date(resume.updatedAt).toLocaleDateString()}</span>
-                            </span>
-                            <Badge variant="secondary" className="text-xs bg-slate-100 text-slate-700">
-                              {templateInfo.name}
-                            </Badge>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <div className="text-sm text-slate-600 space-y-1">
-                              <p className="flex items-center space-x-1">
-                                <Building className="w-4 h-4" />
-                                <span>{resume.experiences.length} experiences</span>
-                              </p>
-                              <p className="flex items-center space-x-1">
-                                <Code className="w-4 h-4" />
-                                <span>{resume.skills.length} skills</span>
-                              </p>
-                            </div>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleEditResume(resume.id)
-                              }}
-                              className="opacity-0 group-hover:opacity-100 transition-all duration-300 border-blue-300 hover:border-blue-400 hover:bg-blue-50 bg-white text-blue-700 hover:text-blue-800 font-medium shadow-sm hover:shadow-md"
-                            >
-                              <Edit className="w-4 h-4 mr-1" />
-                              Edit Resume
-                            </Button>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )
-                })}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="text-center py-16">
+              <div className="w-24 h-24 bg-gradient-to-br from-slate-100 to-slate-200 rounded-3xl flex items-center justify-center mx-auto mb-6">
+                <FileText className="w-12 h-12 text-slate-400" />
               </div>
-            )}
-          </div>
+              <h3 className="text-2xl font-bold text-slate-900 mb-2">
+                {searchTerm ? "No resumes found" : "No resumes yet"}
+              </h3>
+              <p className="text-slate-600 mb-8 max-w-md mx-auto">
+                {searchTerm
+                  ? "Try adjusting your search terms to find what you're looking for."
+                  : "Create your first professional resume with our AI-powered builder and beautiful templates."}
+              </p>
+              <Button
+                onClick={searchTerm ? () => setSearchTerm("") : handleCreateResume}
+                className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg shadow-blue-500/25"
+              >
+                {searchTerm ? (
+                  <>
+                    <Search className="w-4 h-4 mr-2" />
+                    Clear Search
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Create Your First Resume
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
         </div>
+      </div>
+
+      {/* Background Elements */}
+      <div className="fixed top-20 left-10 w-80 h-80 bg-blue-200 rounded-full mix-blend-multiply filter blur-xl opacity-10 animate-blob pointer-events-none" />
+      <div className="fixed top-40 right-10 w-80 h-80 bg-indigo-200 rounded-full mix-blend-multiply filter blur-xl opacity-10 animate-blob animation-delay-2000 pointer-events-none" />
+      <div className="fixed -bottom-20 left-20 w-80 h-80 bg-purple-200 rounded-full mix-blend-multiply filter blur-xl opacity-10 animate-blob animation-delay-4000 pointer-events-none" />
       </div>
     </ProtectedRoute>
   )

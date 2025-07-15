@@ -24,11 +24,11 @@ import {
 
 export default function Home() {
   const [scrollY, setScrollY] = useState(0)
-  const [isVisible, setIsVisible] = useState<Record<string, boolean>>({})
+  const [isVisible, setIsVisible] = useState({})
 
   useEffect(() => {
     // Check if user is already logged in
-    const userData = localStorage.getItem("auth_user")
+    const userData = localStorage.getItem("user")
     if (userData) {
       // If logged in, redirect to dashboard after a short delay
       const timer = setTimeout(() => {
@@ -325,7 +325,7 @@ export default function Home() {
         id="features"
         data-scroll-section
         className={`py-20 bg-white transition-all duration-1000 ${
-          isVisible?.features ? "animate-fade-in-up" : "opacity-0 translate-y-10"
+          isVisible.features ? "animate-fade-in-up" : "opacity-0 translate-y-10"
         }`}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -374,7 +374,7 @@ export default function Home() {
         id="how-it-works"
         data-scroll-section
         className={`py-20 bg-gradient-to-br from-slate-50 to-blue-50/50 transition-all duration-1000 ${
-          isVisible?.["how-it-works"] ? "animate-fade-in-up" : "opacity-0 translate-y-10"
+          isVisible["how-it-works"] ? "animate-fade-in-up" : "opacity-0 translate-y-10"
         }`}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -432,7 +432,7 @@ export default function Home() {
         id="testimonials"
         data-scroll-section
         className={`py-20 bg-white transition-all duration-1000 ${
-          isVisible?.testimonials ? "animate-fade-in-up" : "opacity-0 translate-y-10"
+          isVisible.testimonials ? "animate-fade-in-up" : "opacity-0 translate-y-10"
         }`}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -497,7 +497,7 @@ export default function Home() {
         id="pricing"
         data-scroll-section
         className={`py-20 bg-gradient-to-br from-slate-50 to-blue-50/50 transition-all duration-1000 ${
-          isVisible?.pricing ? "animate-fade-in-up" : "opacity-0 translate-y-10"
+          isVisible.pricing ? "animate-fade-in-up" : "opacity-0 translate-y-10"
         }`}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -598,7 +598,7 @@ export default function Home() {
         id="cta"
         data-scroll-section
         className={`py-20 bg-gradient-to-br from-blue-600 to-indigo-700 relative overflow-hidden transition-all duration-1000 ${
-          isVisible?.cta ? "animate-fade-in-up" : "opacity-0 translate-y-10"
+          isVisible.cta ? "animate-fade-in-up" : "opacity-0 translate-y-10"
         }`}
       >
         <div className="absolute inset-0 bg-black/10" />

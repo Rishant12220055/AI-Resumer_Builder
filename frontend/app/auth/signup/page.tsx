@@ -2,9 +2,8 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -24,18 +23,12 @@ import {
   CheckCircle,
   Sparkles,
   Shield,
-  AlertCircle,
 } from "lucide-react"
-import { apiClient, tokenStorage } from "@/lib/api"
-import { useToast } from "@/hooks/use-toast"
-import { useAuth } from "@/lib/auth-context"
 
 export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const [isGoogleLoading, setIsGoogleLoading] = useState(false)
-  const [isGithubLoading, setIsGithubLoading] = useState(false)
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -44,146 +37,35 @@ export default function SignupPage() {
     confirmPassword: "",
     agreeToTerms: false,
   })
-  const [errors, setErrors] = useState<{ [key: string]: string }>({})
-  
-  const router = useRouter()
-  const { toast } = useToast()
-  const { isAuthenticated, isLoading: authLoading } = useAuth()
-
-  // Redirect if already authenticated
-  useEffect(() => {
-    if (!authLoading && isAuthenticated) {
-      router.push("/dashboard")
-    }
-  }, [isAuthenticated, authLoading, router])
-
-  // Show loading while checking authentication
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/50 flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-slate-600">Loading...</p>
-        </div>
-      </div>
-    )
-  }
-
-  // Don't render signup form if already authenticated
-  if (isAuthenticated) {
-    return null
-  }
-
-  const validateForm = () => {
-    const newErrors: { [key: string]: string } = {}
-
-    if (!formData.firstName) {
-      newErrors.firstName = "First name is required"
-    }
-
-    if (!formData.lastName) {
-      newErrors.lastName = "Last name is required"
-    }
-
-    if (!formData.email) {
-      newErrors.email = "Email is required"
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = "Please enter a valid email address"
-    }
-
-    if (!formData.password) {
-      newErrors.password = "Password is required"
-    } else if (formData.password.length < 6) {
-      newErrors.password = "Password must be at least 6 characters"
-    }
-
-    if (!formData.confirmPassword) {
-      newErrors.confirmPassword = "Please confirm your password"
-    } else if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = "Passwords don't match"
-    }
-
-    if (!formData.agreeToTerms) {
-      newErrors.agreeToTerms = "Please agree to the terms and conditions"
-    }
-
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
-  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
-    if (!validateForm()) {
+    if (formData.password !== formData.confirmPassword) {
+      alert("Passwords don't match!")
+      return
+    }
+    if (!formData.agreeToTerms) {
+      alert("Please agree to the terms and conditions")
       return
     }
 
     setIsLoading(true)
-    setErrors({})
 
-    try {
-      const response = await apiClient.signup(
-        formData.firstName,
-        formData.lastName,
-        formData.email,
-        formData.password
-      )
-      
-      // Store token and user data
-      tokenStorage.setToken(response.token)
-      tokenStorage.setUser(response.user)
-      
-      toast({
-        title: "Welcome to ResumeAI!",
-        description: `Account created successfully for ${response.user.name}`,
-      })
-      
-      // Redirect to dashboard
-      router.push("/dashboard")
-    } catch (error) {
-      console.error('Signup error:', error)
-      const errorMessage = error instanceof Error ? error.message : 'Signup failed. Please try again.'
-      
-      toast({
-        title: "Signup Failed",
-        description: errorMessage,
-        variant: "destructive",
-      })
-    } finally {
+    // Simulate API call
+    setTimeout(() => {
       setIsLoading(false)
-    }
+      // Redirect to dashboard
+      window.location.href = "/dashboard"
+    }, 2000)
   }
 
-  const handleGoogleSignup = async () => {
-    setIsGoogleLoading(true)
-    try {
-      const response = await apiClient.getGoogleAuthUrl()
-      window.location.href = response.url
-    } catch (error) {
-      console.error('Google auth error:', error)
-      toast({
-        title: "Google Signup Error",
-        description: "Failed to initiate Google signup. Please try again.",
-        variant: "destructive",
-      })
-      setIsGoogleLoading(false)
-    }
-  }
-
-  const handleGithubSignup = async () => {
-    setIsGithubLoading(true)
-    try {
-      const response = await apiClient.getGitHubAuthUrl()
-      window.location.href = response.url
-    } catch (error) {
-      console.error('GitHub auth error:', error)
-      toast({
-        title: "GitHub Signup Error",
-        description: "Failed to initiate GitHub signup. Please try again.",
-        variant: "destructive",
-      })
-      setIsGithubLoading(false)
-    }
+  const handleSocialSignup = (provider: string) => {
+    setIsLoading(true)
+    // Simulate social signup
+    setTimeout(() => {
+      setIsLoading(false)
+      window.location.href = "/dashboard"
+    }, 1500)
   }
 
   return (
@@ -219,43 +101,23 @@ export default function SignupPage() {
             <div className="space-y-3">
               <Button
                 variant="outline"
-                className="w-full h-12 border-2 border-slate-300 hover:border-red-400 hover:bg-red-50 transition-all duration-300 group bg-white disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-                onClick={handleGoogleSignup}
-                disabled={isLoading || isGoogleLoading || isGithubLoading}
-                aria-describedby="google-status"
+                className="w-full h-12 border-2 border-slate-200 hover:border-red-300 hover:bg-red-50 bg-white transition-all duration-300 group shadow-sm"
+                onClick={() => handleSocialSignup("google")}
+                disabled={isLoading}
               >
-                {isGoogleLoading ? (
-                  <div className="w-5 h-5 border-2 border-red-400 border-t-transparent rounded-full animate-spin mr-3" />
-                ) : (
-                  <Chrome className="w-5 h-5 mr-3 text-red-500 group-hover:scale-110 transition-transform" />
-                )}
-                <span className="font-semibold text-slate-700 group-hover:text-red-600 transition-colors">
-                  {isGoogleLoading ? "Connecting to Google..." : "Continue with Google"}
-                </span>
+                <Chrome className="w-5 h-5 mr-3 text-red-500 group-hover:scale-110 transition-transform" />
+                <span className="font-semibold text-slate-700">Sign up with Google</span>
               </Button>
-              <div id="google-status" className="sr-only" aria-live="polite">
-                {isGoogleLoading ? "Connecting to Google..." : "Ready to connect with Google"}
-              </div>
 
               <Button
                 variant="outline"
-                className="w-full h-12 border-2 border-slate-300 hover:border-slate-600 hover:bg-slate-50 transition-all duration-300 group bg-white disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-                onClick={handleGithubSignup}
-                disabled={isLoading || isGoogleLoading || isGithubLoading}
-                aria-describedby="github-status"
+                className="w-full h-12 border-2 border-slate-200 hover:border-slate-400 hover:bg-slate-50 bg-white transition-all duration-300 group shadow-sm"
+                onClick={() => handleSocialSignup("github")}
+                disabled={isLoading}
               >
-                {isGithubLoading ? (
-                  <div className="w-5 h-5 border-2 border-slate-400 border-t-transparent rounded-full animate-spin mr-3" />
-                ) : (
-                  <Github className="w-5 h-5 mr-3 text-slate-700 group-hover:scale-110 transition-transform" />
-                )}
-                <span className="font-semibold text-slate-700 group-hover:text-slate-900 transition-colors">
-                  {isGithubLoading ? "Connecting to GitHub..." : "Continue with GitHub"}
-                </span>
+                <Github className="w-5 h-5 mr-3 text-slate-700 group-hover:scale-110 transition-transform" />
+                <span className="font-semibold text-slate-700">Sign up with GitHub</span>
               </Button>
-              <div id="github-status" className="sr-only" aria-live="polite">
-                {isGithubLoading ? "Connecting to GitHub..." : "Ready to connect with GitHub"}
-              </div>
             </div>
 
             <div className="relative">
@@ -281,26 +143,11 @@ export default function SignupPage() {
                       id="firstName"
                       type="text"
                       placeholder="John"
-                      className={`pl-10 h-12 border-2 transition-colors ${
-                        errors.firstName 
-                          ? 'border-red-300 focus:border-red-500' 
-                          : 'border-slate-200 focus:border-blue-500'
-                      }`}
+                      className="pl-10 h-12 border-2 border-slate-200 focus:border-blue-500 transition-colors"
                       value={formData.firstName}
-                      onChange={(e) => {
-                        setFormData({ ...formData, firstName: e.target.value })
-                        if (errors.firstName) {
-                          setErrors({ ...errors, firstName: '' })
-                        }
-                      }}
+                      onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
                       required
                     />
-                    {errors.firstName && (
-                      <div className="flex items-center mt-1 text-sm text-red-600">
-                        <AlertCircle className="w-4 h-4 mr-1" />
-                        {errors.firstName}
-                      </div>
-                    )}
                   </div>
                 </div>
 
@@ -312,26 +159,11 @@ export default function SignupPage() {
                     id="lastName"
                     type="text"
                     placeholder="Doe"
-                    className={`h-12 border-2 transition-colors ${
-                      errors.lastName 
-                        ? 'border-red-300 focus:border-red-500' 
-                        : 'border-slate-200 focus:border-blue-500'
-                    }`}
+                    className="h-12 border-2 border-slate-200 focus:border-blue-500 transition-colors"
                     value={formData.lastName}
-                    onChange={(e) => {
-                      setFormData({ ...formData, lastName: e.target.value })
-                      if (errors.lastName) {
-                        setErrors({ ...errors, lastName: '' })
-                      }
-                    }}
+                    onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
                     required
                   />
-                  {errors.lastName && (
-                    <div className="flex items-center mt-1 text-sm text-red-600">
-                      <AlertCircle className="w-4 h-4 mr-1" />
-                      {errors.lastName}
-                    </div>
-                  )}
                 </div>
               </div>
 
@@ -346,26 +178,11 @@ export default function SignupPage() {
                     id="email"
                     type="email"
                     placeholder="john@example.com"
-                    className={`pl-10 h-12 border-2 transition-colors ${
-                      errors.email 
-                        ? 'border-red-300 focus:border-red-500' 
-                        : 'border-slate-200 focus:border-blue-500'
-                    }`}
+                    className="pl-10 h-12 border-2 border-slate-200 focus:border-blue-500 transition-colors"
                     value={formData.email}
-                    onChange={(e) => {
-                      setFormData({ ...formData, email: e.target.value })
-                      if (errors.email) {
-                        setErrors({ ...errors, email: '' })
-                      }
-                    }}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     required
                   />
-                  {errors.email && (
-                    <div className="flex items-center mt-1 text-sm text-red-600">
-                      <AlertCircle className="w-4 h-4 mr-1" />
-                      {errors.email}
-                    </div>
-                  )}
                 </div>
               </div>
 
@@ -380,18 +197,9 @@ export default function SignupPage() {
                     id="password"
                     type={showPassword ? "text" : "password"}
                     placeholder="Create a strong password"
-                    className={`pl-10 pr-10 h-12 border-2 transition-colors ${
-                      errors.password 
-                        ? 'border-red-300 focus:border-red-500' 
-                        : 'border-slate-200 focus:border-blue-500'
-                    }`}
+                    className="pl-10 pr-10 h-12 border-2 border-slate-200 focus:border-blue-500 transition-colors"
                     value={formData.password}
-                    onChange={(e) => {
-                      setFormData({ ...formData, password: e.target.value })
-                      if (errors.password) {
-                        setErrors({ ...errors, password: '' })
-                      }
-                    }}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                     required
                   />
                   <button
@@ -401,12 +209,6 @@ export default function SignupPage() {
                   >
                     {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
-                  {errors.password && (
-                    <div className="flex items-center mt-1 text-sm text-red-600">
-                      <AlertCircle className="w-4 h-4 mr-1" />
-                      {errors.password}
-                    </div>
-                  )}
                 </div>
               </div>
 
@@ -420,18 +222,9 @@ export default function SignupPage() {
                     id="confirmPassword"
                     type={showConfirmPassword ? "text" : "password"}
                     placeholder="Confirm your password"
-                    className={`pl-10 pr-10 h-12 border-2 transition-colors ${
-                      errors.confirmPassword 
-                        ? 'border-red-300 focus:border-red-500' 
-                        : 'border-slate-200 focus:border-blue-500'
-                    }`}
+                    className="pl-10 pr-10 h-12 border-2 border-slate-200 focus:border-blue-500 transition-colors"
                     value={formData.confirmPassword}
-                    onChange={(e) => {
-                      setFormData({ ...formData, confirmPassword: e.target.value })
-                      if (errors.confirmPassword) {
-                        setErrors({ ...errors, confirmPassword: '' })
-                      }
-                    }}
+                    onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
                     required
                   />
                   <button
@@ -441,52 +234,35 @@ export default function SignupPage() {
                   >
                     {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
-                  {errors.confirmPassword && (
-                    <div className="flex items-center mt-1 text-sm text-red-600">
-                      <AlertCircle className="w-4 h-4 mr-1" />
-                      {errors.confirmPassword}
-                    </div>
-                  )}
                 </div>
               </div>
 
               {/* Terms and Conditions */}
-              <div className="space-y-2">
-                <label className="flex items-start space-x-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    className="mt-1 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                    checked={formData.agreeToTerms}
-                    onChange={(e) => {
-                      setFormData({ ...formData, agreeToTerms: e.target.checked })
-                      if (errors.agreeToTerms) {
-                        setErrors({ ...errors, agreeToTerms: '' })
-                      }
-                    }}
-                  />
-                  <div className="text-sm text-slate-600">
-                    <span>I agree to the </span>
-                    <Link href="/terms" className="text-blue-600 hover:text-blue-700 font-semibold">
-                      Terms of Service
-                    </Link>
-                    <span> and </span>
-                    <Link href="/privacy" className="text-blue-600 hover:text-blue-700 font-semibold">
-                      Privacy Policy
-                    </Link>
-                  </div>
+              <div className="flex items-start space-x-3">
+                <input
+                  type="checkbox"
+                  id="agreeToTerms"
+                  className="mt-1 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                  checked={formData.agreeToTerms}
+                  onChange={(e) => setFormData({ ...formData, agreeToTerms: e.target.checked })}
+                  required
+                />
+                <label htmlFor="agreeToTerms" className="text-sm text-slate-600 leading-relaxed">
+                  I agree to the{" "}
+                  <Link href="/terms" className="text-blue-600 hover:text-blue-700 font-semibold">
+                    Terms of Service
+                  </Link>{" "}
+                  and{" "}
+                  <Link href="/privacy" className="text-blue-600 hover:text-blue-700 font-semibold">
+                    Privacy Policy
+                  </Link>
                 </label>
-                {errors.agreeToTerms && (
-                  <div className="flex items-center mt-1 text-sm text-red-600">
-                    <AlertCircle className="w-4 h-4 mr-1" />
-                    {errors.agreeToTerms}
-                  </div>
-                )}
               </div>
 
               <Button
                 type="submit"
                 className="w-full h-12 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/30 transition-all duration-300 group"
-                disabled={isLoading || isGoogleLoading || isGithubLoading}
+                disabled={isLoading}
               >
                 {isLoading ? (
                   <div className="flex items-center space-x-2">
@@ -519,11 +295,15 @@ export default function SignupPage() {
           <div className="flex items-center justify-center space-x-6 text-sm text-slate-500">
             <div className="flex items-center space-x-2">
               <Shield className="w-4 h-4 text-green-500" />
-              <span>Secure Signup</span>
+              <span>Secure & Private</span>
             </div>
             <div className="flex items-center space-x-2">
-              <Sparkles className="w-4 h-4 text-blue-500" />
-              <span>50K+ Users</span>
+              <CheckCircle className="w-4 h-4 text-blue-500" />
+              <span>Free Forever</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Sparkles className="w-4 h-4 text-purple-500" />
+              <span>AI-Powered</span>
             </div>
           </div>
         </div>

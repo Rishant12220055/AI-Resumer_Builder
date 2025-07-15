@@ -2,125 +2,45 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import Link from "next/link"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
-import { Rocket, Mail, Lock, Eye, EyeOff, ArrowRight, Github, Chrome, Sparkles, CheckCircle, AlertCircle } from "lucide-react"
-import { apiClient, tokenStorage } from "@/lib/api"
-import { useToast } from "@/hooks/use-toast"
+import { Rocket, Mail, Lock, Eye, EyeOff, ArrowRight, Github, Chrome, Sparkles, CheckCircle } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
+import { useToast } from "@/hooks/use-toast"
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const [isGoogleLoading, setIsGoogleLoading] = useState(false)
-  const [isGithubLoading, setIsGithubLoading] = useState(false)
   const [formData, setFormData] = useState({
     email: "",
     password: "",
   })
-  const [errors, setErrors] = useState<{ [key: string]: string }>({})
-  
   const router = useRouter()
-  const searchParams = useSearchParams()
+  const { login } = useAuth()
   const { toast } = useToast()
-  const { isAuthenticated, isLoading: authLoading, login } = useAuth()
-
-  // Redirect if already authenticated
-  useEffect(() => {
-    if (!authLoading && isAuthenticated) {
-      router.push("/dashboard")
-    }
-  }, [isAuthenticated, authLoading, router])
-
-  // Check for error messages from OAuth callbacks
-  useEffect(() => {
-    const error = searchParams.get('error')
-    if (error) {
-      toast({
-        title: "Authentication Error",
-        description: decodeURIComponent(error),
-        variant: "destructive",
-      })
-    }
-  }, [searchParams, toast])
-
-  // Show loading while checking authentication
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/50 flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-slate-600">Loading...</p>
-        </div>
-      </div>
-    )
-  }
-
-  // Don't render login form if already authenticated
-  if (isAuthenticated) {
-    return null
-  }
-
-  const validateForm = () => {
-    const newErrors: { [key: string]: string } = {}
-
-    if (!formData.email.trim()) {
-      newErrors.email = "Email is required"
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
-      newErrors.email = "Please enter a valid email address"
-    }
-
-    if (!formData.password) {
-      newErrors.password = "Password is required"
-    } else if (formData.password.length < 6) {
-      newErrors.password = "Password must be at least 6 characters"
-    }
-
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
-  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
-    if (!validateForm()) {
-      return
-    }
-
     setIsLoading(true)
-    setErrors({})
 
     try {
-      await login(formData.email.trim(), formData.password)
+      await login(formData.email, formData.password)
       toast({
-        title: "Welcome back!",
-        description: `Successfully logged in as ${formData.email}`,
+        title: "Success!",
+        description: "You have been logged in successfully.",
       })
       router.push("/dashboard")
-    } catch (error) {
-      console.error('Login error:', error)
-      let errorMessage = 'Login failed. Please try again.'
-      
-      if (error instanceof Error) {
-        if (error.message.includes('Invalid email or password')) {
-          errorMessage = 'Invalid email or password. Please check your credentials.'
-        } else if (error.message.includes('Network error')) {
-          errorMessage = 'Network error. Please check your internet connection.'
-        } else {
-          errorMessage = error.message
-        }
-      }
-      
+    } catch (error: any) {
       toast({
-        title: "Login Failed",
-        description: errorMessage,
+        title: "Error",
+        description: error.message || "Failed to login. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -128,35 +48,23 @@ export default function LoginPage() {
     }
   }
 
-  const handleGoogleLogin = async () => {
-    setIsGoogleLoading(true)
+  const handleSocialLogin = async (provider: string) => {
+    setIsLoading(true)
     try {
-      const response = await apiClient.getGoogleAuthUrl()
-      window.location.href = response.url
-    } catch (error) {
-      console.error('Google auth error:', error)
+      // For now, we'll simulate social login
+      // In a real implementation, you'd redirect to the OAuth provider
       toast({
-        title: "Google Login Error",
-        description: "Failed to initiate Google login. Please try again.",
+        title: "Coming Soon",
+        description: `${provider} login will be available soon!`,
+      })
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Social login failed. Please try again.",
         variant: "destructive",
       })
-      setIsGoogleLoading(false)
-    }
-  }
-
-  const handleGithubLogin = async () => {
-    setIsGithubLoading(true)
-    try {
-      const response = await apiClient.getGitHubAuthUrl()
-      window.location.href = response.url
-    } catch (error) {
-      console.error('GitHub auth error:', error)
-      toast({
-        title: "GitHub Login Error",
-        description: "Failed to initiate GitHub login. Please try again.",
-        variant: "destructive",
-      })
-      setIsGithubLoading(false)
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -193,43 +101,23 @@ export default function LoginPage() {
             <div className="space-y-3">
               <Button
                 variant="outline"
-                className="w-full h-12 border-2 border-slate-300 hover:border-red-400 hover:bg-red-50 transition-all duration-300 group bg-white disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-                onClick={handleGoogleLogin}
-                disabled={isLoading || isGoogleLoading || isGithubLoading}
-                aria-describedby="google-status"
+                className="w-full h-12 border-2 border-slate-200 hover:border-red-300 hover:bg-red-50 bg-white transition-all duration-300 group shadow-sm"
+                onClick={() => handleSocialLogin("google")}
+                disabled={isLoading}
               >
-                {isGoogleLoading ? (
-                  <div className="w-5 h-5 border-2 border-red-400 border-t-transparent rounded-full animate-spin mr-3" />
-                ) : (
-                  <Chrome className="w-5 h-5 mr-3 text-red-500 group-hover:scale-110 transition-transform" />
-                )}
-                <span className="font-semibold text-slate-700 group-hover:text-red-600 transition-colors">
-                  {isGoogleLoading ? "Connecting to Google..." : "Continue with Google"}
-                </span>
+                <Chrome className="w-5 h-5 mr-3 text-red-500 group-hover:scale-110 transition-transform" />
+                <span className="font-semibold text-slate-700">Continue with Google</span>
               </Button>
-              <div id="google-status" className="sr-only" aria-live="polite">
-                {isGoogleLoading ? "Connecting to Google..." : "Ready to connect with Google"}
-              </div>
 
               <Button
                 variant="outline"
-                className="w-full h-12 border-2 border-slate-300 hover:border-slate-600 hover:bg-slate-50 transition-all duration-300 group bg-white disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-                onClick={handleGithubLogin}
-                disabled={isLoading || isGoogleLoading || isGithubLoading}
-                aria-describedby="github-status"
+                className="w-full h-12 border-2 border-slate-200 hover:border-slate-400 hover:bg-slate-50 bg-white transition-all duration-300 group shadow-sm"
+                onClick={() => handleSocialLogin("github")}
+                disabled={isLoading}
               >
-                {isGithubLoading ? (
-                  <div className="w-5 h-5 border-2 border-slate-400 border-t-transparent rounded-full animate-spin mr-3" />
-                ) : (
-                  <Github className="w-5 h-5 mr-3 text-slate-700 group-hover:scale-110 transition-transform" />
-                )}
-                <span className="font-semibold text-slate-700 group-hover:text-slate-900 transition-colors">
-                  {isGithubLoading ? "Connecting to GitHub..." : "Continue with GitHub"}
-                </span>
+                <Github className="w-5 h-5 mr-3 text-slate-700 group-hover:scale-110 transition-transform" />
+                <span className="font-semibold text-slate-700">Continue with GitHub</span>
               </Button>
-              <div id="github-status" className="sr-only" aria-live="polite">
-                {isGithubLoading ? "Connecting to GitHub..." : "Ready to connect with GitHub"}
-              </div>
             </div>
 
             <div className="relative">
@@ -245,42 +133,25 @@ export default function LoginPage() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="email" className="text-sm font-semibold text-slate-700">
-                  Email Address *
+                  Email Address
                 </Label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
                   <Input
                     id="email"
                     type="email"
-                    placeholder="Enter your email address"
-                    className={`pl-10 h-12 border-2 transition-colors ${
-                      errors.email 
-                        ? 'border-red-300 focus:border-red-500' 
-                        : 'border-slate-200 focus:border-blue-500'
-                    }`}
+                    placeholder="Enter your email"
+                    className="pl-10 h-12 border-2 border-slate-200 focus:border-blue-500 transition-colors"
                     value={formData.email}
-                    onChange={(e) => {
-                      setFormData({ ...formData, email: e.target.value })
-                      if (errors.email) {
-                        setErrors({ ...errors, email: '' })
-                      }
-                    }}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     required
-                    aria-describedby={errors.email ? "email-error" : undefined}
-                    autoComplete="email"
                   />
-                  {errors.email && (
-                    <div id="email-error" className="flex items-center mt-1 text-sm text-red-600" role="alert">
-                      <AlertCircle className="w-4 h-4 mr-1" />
-                      {errors.email}
-                    </div>
-                  )}
                 </div>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="password" className="text-sm font-semibold text-slate-700">
-                  Password *
+                  Password
                 </Label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
@@ -288,58 +159,35 @@ export default function LoginPage() {
                     id="password"
                     type={showPassword ? "text" : "password"}
                     placeholder="Enter your password"
-                    className={`pl-10 pr-10 h-12 border-2 transition-colors ${
-                      errors.password 
-                        ? 'border-red-300 focus:border-red-500' 
-                        : 'border-slate-200 focus:border-blue-500'
-                    }`}
+                    className="pl-10 pr-10 h-12 border-2 border-slate-200 focus:border-blue-500 transition-colors"
                     value={formData.password}
-                    onChange={(e) => {
-                      setFormData({ ...formData, password: e.target.value })
-                      if (errors.password) {
-                        setErrors({ ...errors, password: '' })
-                      }
-                    }}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                     required
-                    aria-describedby={errors.password ? "password-error" : undefined}
-                    autoComplete="current-password"
                   />
                   <button
                     type="button"
                     className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
                     onClick={() => setShowPassword(!showPassword)}
-                    aria-label={showPassword ? "Hide password" : "Show password"}
                   >
                     {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
-                  {errors.password && (
-                    <div id="password-error" className="flex items-center mt-1 text-sm text-red-600" role="alert">
-                      <AlertCircle className="w-4 h-4 mr-1" />
-                      {errors.password}
-                    </div>
-                  )}
                 </div>
               </div>
 
               <div className="flex items-center justify-between text-sm">
                 <label className="flex items-center space-x-2 cursor-pointer">
-                  <input 
-                    type="checkbox" 
-                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
-                    id="remember-me"
-                  />
+                  <input type="checkbox" className="rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
                   <span className="text-slate-600">Remember me</span>
                 </label>
-                <Link href="/auth/forgot-password" className="text-blue-600 hover:text-blue-700 font-semibold transition-colors">
+                <Link href="/auth/forgot-password" className="text-blue-600 hover:text-blue-700 font-semibold">
                   Forgot password?
                 </Link>
               </div>
 
               <Button
                 type="submit"
-                className="w-full h-12 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/30 transition-all duration-300 group disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={isLoading || isGoogleLoading || isGithubLoading}
-                aria-describedby="submit-status"
+                className="w-full h-12 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/30 transition-all duration-300 group"
+                disabled={isLoading}
               >
                 {isLoading ? (
                   <div className="flex items-center space-x-2">
@@ -353,9 +201,6 @@ export default function LoginPage() {
                   </>
                 )}
               </Button>
-              <div id="submit-status" className="sr-only" aria-live="polite">
-                {isLoading ? "Signing in..." : "Ready to sign in"}
-              </div>
             </form>
 
             {/* Sign Up Link */}

@@ -1,47 +1,110 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+const API_BASE_URL = 'http://localhost:5000/api';
 
-export interface LoginResponse {
-  user: {
-    id: string;
-    name: string;
-    email: string;
-  };
+// Types
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  picture?: string;
+}
+
+export interface AuthResponse {
+  user: User;
   token: string;
 }
 
-export interface AuthError {
-  error: string;
+export interface Resume {
+  _id: string;
+  user_id: string;
+  title: string;
+  template: string;
+  personalInfo?: PersonalInfo;
+  experiences?: Experience[];
+  educations?: Education[];
+  skills?: Skill[];
+  projects?: Project[];
+  certifications?: Certification[];
+  createdAt?: string;
+  updatedAt?: string;
 }
 
-export interface GoogleAuthUrlResponse {
-  url: string;
+export interface PersonalInfo {
+  _id?: string;
+  resume_id?: string;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  linkedin?: string;
+  github?: string;
+  website?: string;
+  summary?: string;
 }
 
-export interface GitHubAuthUrlResponse {
-  url: string;
+export interface Experience {
+  _id?: string;
+  resume_id?: string;
+  company: string;
+  position: string;
+  duration: string;
+  bullets: string[];
 }
 
-export interface AISuggestionRequest {
-  context: 'resume_bullet_point' | 'education_achievement' | 'skills_suggestion' | 'project_description' | 'certification_suggestion' | 'about_me_description';
-  company?: string;
-  position?: string;
-  duration?: string;
-  institution?: string;
-  degree?: string;
-  industry?: string;
-  projectName?: string;
-  name?: string;
+export interface Education {
+  _id?: string;
+  resume_id?: string;
+  institution: string;
+  degree: string;
+  duration: string;
+  achievements: string[];
 }
 
-export interface AISuggestionResponse {
-  suggestions: string[];
+export interface Skill {
+  _id?: string;
+  resume_id?: string;
+  name: string;
+  level: string;
 }
 
+export interface Project {
+  _id?: string;
+  resume_id?: string;
+  name: string;
+  description: string;
+  technologies: string;
+  link: string;
+}
+
+export interface Certification {
+  _id?: string;
+  resume_id?: string;
+  name: string;
+  issuer: string;
+  date: string;
+  link: string;
+}
+
+export interface AISuggestion {
+  suggestion: string;
+  type: 'experience' | 'education' | 'skill' | 'project' | 'summary';
+}
+
+// API Client Class
 class ApiClient {
   private baseUrl: string;
+  private token: string | null = null;
 
-  constructor(baseUrl: string) {
+  constructor(baseUrl: string = API_BASE_URL) {
     this.baseUrl = baseUrl;
+    // Initialize token from localStorage
+    this.initializeToken();
+  }
+
+  private initializeToken() {
+    if (typeof window !== 'undefined') {
+      this.token = localStorage.getItem('auth_token');
+    }
   }
 
   private async request<T>(
@@ -49,123 +112,188 @@ class ApiClient {
     options: RequestInit = {}
   ): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...(options.headers as Record<string, string>),
+    };
+
+    // Get the current token (in case it was updated elsewhere)
+    const currentToken = this.getToken();
+    if (currentToken) {
+      headers.Authorization = `Bearer ${currentToken}`;
+    }
+
     const config: RequestInit = {
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
       ...options,
+      headers,
     };
 
     try {
       const response = await fetch(url, config);
       
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Network error' }));
+        const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
       }
 
       return await response.json();
     } catch (error) {
-      if (error instanceof Error) {
-        throw error;
-      }
-      throw new Error('Network error');
+      console.error('API request failed:', error);
+      throw error;
     }
   }
 
-  // Login with email and password
-  async login(email: string, password: string): Promise<LoginResponse> {
-    return this.request<LoginResponse>('/auth/login', {
+  // Authentication methods
+  setToken(token: string) {
+    this.token = token;
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('auth_token', token);
+    }
+  }
+
+  clearToken() {
+    this.token = null;
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('auth_token');
+    }
+  }
+
+  getToken(): string | null {
+    // Always get the latest token from localStorage
+    if (typeof window !== 'undefined') {
+      const storedToken = localStorage.getItem('auth_token');
+      // Update the instance token if it's different
+      if (storedToken !== this.token) {
+        this.token = storedToken;
+      }
+      return storedToken;
+    }
+    return this.token;
+  }
+
+  async signup(data: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    password: string;
+  }): Promise<AuthResponse> {
+    const response = await this.request<AuthResponse>('/auth/signup', {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify(data),
+    });
+    this.setToken(response.token);
+    return response;
+  }
+
+  async login(data: { email: string; password: string }): Promise<AuthResponse> {
+    const response = await this.request<AuthResponse>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    this.setToken(response.token);
+    return response;
+  }
+
+  async logout(): Promise<void> {
+    this.clearToken();
+  }
+
+  async getGoogleAuthUrl(): Promise<{ url: string }> {
+    return this.request<{ url: string }>('/auth/google/url');
+  }
+
+  async getGithubAuthUrl(): Promise<{ url: string }> {
+    return this.request<{ url: string }>('/auth/github/url');
+  }
+
+  // Resume methods
+  async getResumes(): Promise<Resume[]> {
+    return this.request<Resume[]>('/resumes');
+  }
+
+  async getResume(id: string): Promise<Resume> {
+    return this.request<Resume>(`/resumes/${id}`);
+  }
+
+  async createResume(data: { title?: string; template?: string }): Promise<Resume> {
+    return this.request<Resume>('/resumes', {
+      method: 'POST',
+      body: JSON.stringify(data),
     });
   }
 
-  // Signup with user details
-  async signup(firstName: string, lastName: string, email: string, password: string): Promise<LoginResponse> {
-    return this.request<LoginResponse>('/auth/signup', {
-      method: 'POST',
-      body: JSON.stringify({ firstName, lastName, email, password }),
+  async updateResume(id: string, data: Partial<Resume>): Promise<{ success: boolean }> {
+    return this.request<{ success: boolean }>(`/resumes/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
     });
   }
 
-  // Get Google OAuth URL
-  async getGoogleAuthUrl(): Promise<GoogleAuthUrlResponse> {
-    return this.request<GoogleAuthUrlResponse>('/auth/google/url');
-  }
-
-  // Get GitHub OAuth URL
-  async getGitHubAuthUrl(): Promise<GitHubAuthUrlResponse> {
-    return this.request<GitHubAuthUrlResponse>('/auth/github/url');
-  }
-
-  // Logout
-  async logout(token: string): Promise<{ message: string }> {
-    return this.request<{ message: string }>('/auth/logout', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
+  async deleteResume(id: string): Promise<{ success: boolean }> {
+    return this.request<{ success: boolean }>(`/resumes/${id}`, {
+      method: 'DELETE',
     });
   }
 
   // AI Suggestions
-  async getAISuggestions(request: AISuggestionRequest): Promise<AISuggestionResponse> {
-    return this.request<AISuggestionResponse>('/ai-suggest', {
+  async getAISuggestions(data: {
+    context: string;
+    company?: string;
+    position?: string;
+    duration?: string;
+    institution?: string;
+    degree?: string;
+    industry?: string;
+    projectName?: string;
+    name?: string;
+  }): Promise<{ suggestions: string[] }> {
+    return this.request<{ suggestions: string[] }>('/ai-suggest', {
       method: 'POST',
-      body: JSON.stringify(request),
+      body: JSON.stringify(data),
     });
+  }
+
+  // Health checks
+  async healthCheck(): Promise<{ status: string; timestamp: string }> {
+    return this.request<{ status: string; timestamp: string }>('/health');
+  }
+
+  async mongoHealthCheck(): Promise<{ status: string; database: string; timestamp: string }> {
+    return this.request<{ status: string; database: string; timestamp: string }>('/mongo-health');
   }
 }
 
-export const apiClient = new ApiClient(API_BASE_URL);
+// Create and export a singleton instance
+export const apiClient = new ApiClient();
 
-// Token management utilities - Only use these in useEffect or event handlers
-export const tokenStorage = {
-  setToken: (token: string) => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('auth_token', token);
-    }
-  },
+// Export the class for testing or custom instances
+export { ApiClient };
 
-  getToken: (): string | null => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('auth_token');
-    }
-    return null;
-  },
-
-  removeToken: () => {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('auth_token');
-    }
-  },
-
-  setUser: (user: any) => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('auth_user', JSON.stringify(user));
-    }
-  },
-
-  getUser: () => {
-    if (typeof window !== 'undefined') {
-      const user = localStorage.getItem('auth_user');
-      return user ? JSON.parse(user) : null;
-    }
-    return null;
-  },
-
-  removeUser: () => {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('auth_user');
-    }
-  },
-
-  clearAuth: () => {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('auth_user');
-    }
-  }
+// Convenience functions for common operations
+export const api = {
+  // Auth
+  signup: (data: Parameters<typeof apiClient.signup>[0]) => apiClient.signup(data),
+  login: (data: Parameters<typeof apiClient.login>[0]) => apiClient.login(data),
+  logout: () => apiClient.logout(),
+  getGoogleAuthUrl: () => apiClient.getGoogleAuthUrl(),
+  getGithubAuthUrl: () => apiClient.getGithubAuthUrl(),
+  
+  // Resumes
+  getResumes: () => apiClient.getResumes(),
+  getResume: (id: string) => apiClient.getResume(id),
+  createResume: (data: Parameters<typeof apiClient.createResume>[0]) => apiClient.createResume(data),
+  updateResume: (id: string, data: Parameters<typeof apiClient.updateResume>[1]) => apiClient.updateResume(id, data),
+  deleteResume: (id: string) => apiClient.deleteResume(id),
+  
+  // AI
+  getAISuggestions: (data: Parameters<typeof apiClient.getAISuggestions>[0]) => apiClient.getAISuggestions(data),
+  
+  // Health
+  healthCheck: () => apiClient.healthCheck(),
+  mongoHealthCheck: () => apiClient.mongoHealthCheck(),
+  
+  // Token management
+  setToken: (token: string) => apiClient.setToken(token),
+  getToken: () => apiClient.getToken(),
+  clearToken: () => apiClient.clearToken(),
 }; 

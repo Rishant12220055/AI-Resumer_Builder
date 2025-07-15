@@ -1,39 +1,37 @@
-"use client"
+"use client";
 
-import { useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { useAuth } from "@/lib/auth-context"
-import { Loader2 } from "lucide-react"
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/auth-context";
 
 interface ProtectedRouteProps {
-  children: React.ReactNode
+  children: React.ReactNode;
 }
 
-export default function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { user, isLoading } = useAuth()
-  const router = useRouter()
+export function ProtectedRoute({ children }: ProtectedRouteProps) {
+  const { isAuthenticated, loading } = useAuth();
+  const router = useRouter();
 
   useEffect(() => {
-    if (!isLoading && !user) {
-      router.push("/auth/login")
+    if (!loading && !isAuthenticated) {
+      router.push("/auth/login");
     }
-  }, [user, isLoading, router])
+  }, [isAuthenticated, loading, router]);
 
-  if (isLoading) {
+  if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/50 flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto" />
-          <h2 className="text-xl font-semibold text-slate-900">Loading...</h2>
-          <p className="text-slate-600">Please wait while we verify your authentication.</p>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
         </div>
       </div>
-    )
+    );
   }
 
-  if (!user) {
-    return null // Will redirect to login
+  if (!isAuthenticated) {
+    return null; // Will redirect in useEffect
   }
 
-  return <>{children}</>
+  return <>{children}</>;
 } 
