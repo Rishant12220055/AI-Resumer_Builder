@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, use } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -117,20 +117,21 @@ const templateData: Record<string, Template> = {
   },
 }
 
-export default function TemplatePreview({ params }: { params: { id: string } }) {
+export default function TemplatePreview({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter()
+  const { id } = use(params)
   const [template, setTemplate] = useState<Template | null>(null)
   const [isVisible, setIsVisible] = useState(false)
 
   useEffect(() => {
-    const templateInfo = templateData[params.id]
+    const templateInfo = templateData[id]
     if (!templateInfo) {
       router.push("/templates")
       return
     }
     setTemplate(templateInfo)
     setTimeout(() => setIsVisible(true), 100)
-  }, [params.id, router])
+  }, [id, router])
 
   const handleUseTemplate = () => {
     if (!template) return

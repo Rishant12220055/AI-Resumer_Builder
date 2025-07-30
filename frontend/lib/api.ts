@@ -133,12 +133,41 @@ class ApiClient {
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+        let errorMessage = errorData.error || `HTTP error! status: ${response.status}`;
+        
+        // Handle specific AI service errors
+        if (errorMessage.includes('overloaded') || errorMessage.includes('rate limit') || response.status === 429) {
+          errorMessage = 'AI service is currently busy. Please try again in a few moments.';
+        } else if (response.status === 503) {
+          errorMessage = 'AI service is temporarily unavailable. Please try again later.';
+        } else if (response.status >= 500) {
+          errorMessage = 'Server error occurred. Please try again later.';
+        }
+        
+        // Create error with additional properties for better handling
+        const error = new Error(errorMessage);
+        (error as any).status = response.status;
+        (error as any).isRetryable = response.status === 429 || response.status === 503 || errorMessage.includes('overloaded') || errorMessage.includes('busy');
+        throw error;
       }
 
       return await response.json();
     } catch (error) {
-      console.error('API request failed:', error);
+      // Only log unexpected errors, not retryable service busy errors
+      const isRetryableError = error instanceof Error && 
+                              (error.message.includes('busy') || 
+                               error.message.includes('overloaded') || 
+                               (error as any).isRetryable);
+      
+      if (!isRetryableError) {
+        console.error('API request failed:', error);
+      }
+      
+      // Handle network errors
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        throw new Error('Network error. Please check your connection and try again.');
+      }
+      
       throw error;
     }
   }

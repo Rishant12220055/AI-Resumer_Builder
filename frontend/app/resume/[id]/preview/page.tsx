@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, use } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -82,7 +82,7 @@ const templateStyles = {
 
 export default function ResumePreview({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter()
-  const { id } = React.use<{ id: string }>(params)
+  const { id } = use(params)
   const { user } = useAuth()
   const { toast } = useToast()
   const [resume, setResume] = useState<Resume | null>(null)
@@ -120,7 +120,7 @@ export default function ResumePreview({ params }: { params: Promise<{ id: string
     }
   }, [id, user, router, toast])
 
-  // Real-time updates - refresh data every 10 seconds (increased from 3 seconds)
+  // Real-time updates - refresh data every 3 seconds for better responsiveness
   useEffect(() => {
     if (!user || !id || !autoRefresh) return
 
@@ -134,7 +134,7 @@ export default function ResumePreview({ params }: { params: Promise<{ id: string
       } finally {
         setIsRefreshing(false)
       }
-    }, 10000) // Refresh every 10 seconds instead of 3
+    }, 3000) // Refresh every 3 seconds for better real-time experience
 
     return () => clearInterval(interval)
   }, [id, user, autoRefresh])
@@ -213,7 +213,7 @@ export default function ResumePreview({ params }: { params: Promise<{ id: string
     )
   }
 
-  const currentStyle = templateStyles[selectedTemplate as keyof typeof templateStyles]
+  const currentStyle = templateStyles[selectedTemplate as keyof typeof templateStyles] || templateStyles.professional
 
   return (
     <ProtectedRoute>
@@ -237,7 +237,9 @@ export default function ResumePreview({ params }: { params: Promise<{ id: string
                     </div>
                     <div>
                       <span className="text-lg font-bold text-slate-900">Live Preview</span>
-                      <Badge className="ml-2 bg-violet-100 text-violet-700 text-xs">{currentStyle.name}</Badge>
+                      <Badge className="ml-2 bg-violet-100 text-violet-700 text-xs">
+                        {templateStyles[selectedTemplate as keyof typeof templateStyles]?.name || "Professional Classic"}
+                      </Badge>
                       {isRefreshing && (
                         <Badge className="ml-2 bg-green-100 text-green-700 text-xs animate-pulse">
                           Updating...
@@ -248,14 +250,21 @@ export default function ResumePreview({ params }: { params: Promise<{ id: string
                 </div>
 
                                   <div className="flex items-center space-x-4">
-                    {/* Auto-refresh Toggle */}
+                    {/* Auto-refresh Toggle with better visual feedback */}
                     <div className="flex items-center space-x-2">
                       <Switch
                         checked={autoRefresh}
                         onCheckedChange={setAutoRefresh}
                         className="data-[state=checked]:bg-violet-600"
                       />
-                      <Label className="text-sm text-slate-600">Auto-refresh</Label>
+                      <Label className="text-sm text-slate-600 flex items-center space-x-1">
+                        <span>Auto-refresh</span>
+                        {autoRefresh && (
+                          <Badge className="bg-violet-100 text-violet-600 text-xs px-1 py-0.5">
+                            3s
+                          </Badge>
+                        )}
+                      </Label>
                     </div>
                     
                     {/* Refresh Button */}

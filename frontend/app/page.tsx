@@ -24,17 +24,67 @@ import {
 
 export default function Home() {
   const [scrollY, setScrollY] = useState(0)
-  const [isVisible, setIsVisible] = useState({})
+  const [isVisible, setIsVisible] = useState<{[key: string]: boolean}>({})
+
+  // Debug function to clear all authentication data
+  const clearAuthData = () => {
+    localStorage.removeItem("auth_token")
+    localStorage.removeItem("user_info")
+    localStorage.removeItem("user")
+    console.log("All authentication data cleared")
+    window.location.reload()
+  }
 
   useEffect(() => {
-    // Check if user is already logged in
-    const userData = localStorage.getItem("user")
-    if (userData) {
-      // If logged in, redirect to dashboard after a short delay
-      const timer = setTimeout(() => {
-        window.location.href = "/dashboard"
-      }, 2000)
-      return () => clearTimeout(timer)
+    // Check if user is already logged in and has valid authentication
+    const authToken = localStorage.getItem("auth_token")
+    const userData = localStorage.getItem("user_info")
+    
+    if (authToken && userData) {
+      try {
+        // Validate the token by making a test API call
+        const testAuth = async () => {
+          try {
+            const response = await fetch('http://localhost:5000/api/resumes', {
+              headers: {
+                'Authorization': `Bearer ${authToken}`,
+                'Content-Type': 'application/json'
+              }
+            })
+            
+            if (response.ok) {
+              // Token is valid, redirect to dashboard
+              console.log("Valid authentication found, redirecting to dashboard")
+              setTimeout(() => {
+                window.location.href = "/dashboard"
+              }, 1000)
+            } else {
+              // Token is invalid, clear it
+              console.log("Invalid authentication, clearing stored data")
+              localStorage.removeItem("auth_token")
+              localStorage.removeItem("user_info")
+              localStorage.removeItem("user") // Also clear old format
+            }
+          } catch (error) {
+            console.log("Authentication check failed, clearing stored data")
+            localStorage.removeItem("auth_token")
+            localStorage.removeItem("user_info")
+            localStorage.removeItem("user") // Also clear old format
+          }
+        }
+        
+        testAuth()
+      } catch (error) {
+        // Invalid JSON or other error, clear storage
+        localStorage.removeItem("auth_token")
+        localStorage.removeItem("user_info")
+        localStorage.removeItem("user") // Also clear old format
+      }
+    } else {
+      // Clear any old authentication data that might be incomplete
+      localStorage.removeItem("auth_token")
+      localStorage.removeItem("user_info")
+      localStorage.removeItem("user") // Also clear old format
     }
 
     // Scroll effect handler
@@ -182,6 +232,16 @@ export default function Home() {
                   <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               </Link>
+              {/* Debug button to clear auth data */}
+              <Button 
+                onClick={clearAuthData}
+                variant="outline"
+                size="sm"
+                className="text-xs opacity-50 hover:opacity-100"
+                title="Clear authentication data (debug)"
+              >
+                Clear Auth
+              </Button>
             </div>
           </div>
         </div>
@@ -325,7 +385,7 @@ export default function Home() {
         id="features"
         data-scroll-section
         className={`py-20 bg-white transition-all duration-1000 ${
-          isVisible.features ? "animate-fade-in-up" : "opacity-0 translate-y-10"
+          isVisible?.features ? "animate-fade-in-up" : "opacity-0 translate-y-10"
         }`}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -374,7 +434,7 @@ export default function Home() {
         id="how-it-works"
         data-scroll-section
         className={`py-20 bg-gradient-to-br from-slate-50 to-blue-50/50 transition-all duration-1000 ${
-          isVisible["how-it-works"] ? "animate-fade-in-up" : "opacity-0 translate-y-10"
+          isVisible?.["how-it-works"] ? "animate-fade-in-up" : "opacity-0 translate-y-10"
         }`}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

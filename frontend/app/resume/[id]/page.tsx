@@ -1,11 +1,6 @@
-// Placeholder for Next.js static export requirement
-export async function generateStaticParams() {
-  // TODO: Replace with real IDs from your data source
-  return [{ id: 'example-id-1' }, { id: 'example-id-2' }];
-}
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, use } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -47,6 +42,7 @@ import {
   Calendar,
   Star,
   Edit3,
+  Check,
 } from "lucide-react"
 import React from "react"
 import { api, Resume } from "@/lib/api"
@@ -56,7 +52,7 @@ import { ProtectedRoute } from "@/components/protected-route"
 
 export default function ResumeBuilder({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter()
-  const { id } = React.use<{ id: string }>(params)
+  const { id } = use(params)
   const { user } = useAuth()
   const { toast } = useToast()
   const [resume, setResume] = useState<Resume | null>(null)
@@ -64,48 +60,84 @@ export default function ResumeBuilder({ params }: { params: Promise<{ id: string
   const [isAIMode, setIsAIMode] = useState(false)
   const [aiPrompt, setAiPrompt] = useState("")
   const [isGenerating, setIsGenerating] = useState(false)
+  const [isRetrying, setIsRetrying] = useState(false)
+  const [retryCount, setRetryCount] = useState(0)
   const [isVisible, setIsVisible] = useState(false)
   const [loading, setLoading] = useState(true)
   const [newSkill, setNewSkill] = useState("")
+  const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "unsaved">("saved")
   // 1. Add state to track which project is being generated
   const [generatingProjectId, setGeneratingProjectId] = useState<string | null>(null);
 
   useEffect(() => {
     const loadResume = async () => {
       try {
+        console.log("Loading resume with ID:", id)
+        console.log("User authenticated:", !!user)
+        console.log("Auth token exists:", !!api.getToken())
+        
         const fetchedResume = await api.getResume(id)
+        console.log("Resume loaded successfully:", fetchedResume)
         setResume(fetchedResume)
       } catch (error: any) {
         console.error("Error loading resume:", error)
-        toast({
-          title: "Error",
-          description: "Failed to load resume. Please try again.",
-          variant: "destructive",
-        })
-        router.push("/dashboard")
+        console.error("Error status:", error.status)
+        console.error("Error response:", error.response)
+        
+        if (error.status === 401) {
+          toast({
+            title: "Authentication Error",
+            description: "Please log in again to continue.",
+            variant: "destructive",
+          })
+          router.push("/auth/login")
+        } else if (error.status === 404) {
+          toast({
+            title: "Resume Not Found",
+            description: "The requested resume could not be found.",
+            variant: "destructive",
+          })
+          router.push("/dashboard")
+        } else {
+          toast({
+            title: "Error",
+            description: "Failed to load resume. Please try again.",
+            variant: "destructive",
+          })
+          router.push("/dashboard")
+        }
       } finally {
         setLoading(false)
         setTimeout(() => setIsVisible(true), 100)
       }
     }
 
+    console.log("useEffect triggered - user:", !!user, "id:", id, "loading:", loading)
     if (user && id) {
       loadResume()
+    } else if (!user && !loading) {
+      console.log("No user found after loading completed - user will be redirected by ProtectedRoute")
     }
-  }, [id, user, router, toast])
+  }, [id, user, router, toast, loading])
 
-  // Auto-save functionality
+  // Auto-save functionality with status tracking
   useEffect(() => {
     if (!resume || loading) return
 
+    // Mark as unsaved when resume data changes
+    setSaveStatus("unsaved")
+
     const autoSaveTimer = setTimeout(async () => {
       try {
+        setSaveStatus("saving")
         await api.updateResume(resume._id, resume)
+        setSaveStatus("saved")
         console.log("Auto-saved resume")
       } catch (error) {
+        setSaveStatus("unsaved")
         console.error("Auto-save failed:", error)
       }
-    }, 2000) // Auto-save after 2 seconds of inactivity
+    }, 1500) // Auto-save after 1.5 seconds of inactivity for faster updates
 
     return () => clearTimeout(autoSaveTimer)
   }, [resume, loading])
@@ -114,12 +146,15 @@ export default function ResumeBuilder({ params }: { params: Promise<{ id: string
     if (!resume) return
 
     try {
+      setSaveStatus("saving")
       await api.updateResume(resume._id, resume)
+      setSaveStatus("saved")
       toast({
         title: "Success",
         description: "Resume saved successfully!",
       })
     } catch (error: any) {
+      setSaveStatus("unsaved")
       toast({
         title: "Error",
         description: "Failed to save resume. Please try again.",
@@ -285,8 +320,13 @@ export default function ResumeBuilder({ params }: { params: Promise<{ id: string
     })
   }
 
-  const generateWithAI = async (context: string, data: any) => {
+  const generateWithAI = async (context: string, data: any, retries = 0) => {
     setIsGenerating(true)
+    if (retries > 0) {
+      setIsRetrying(true)
+      setRetryCount(retries)
+    }
+    
     try {
       const response = await api.getAISuggestions({ context, ...data })
       toast({
@@ -295,14 +335,56 @@ export default function ResumeBuilder({ params }: { params: Promise<{ id: string
       })
       return response
     } catch (error: any) {
-      console.error("AI generation error:", error)
+      // Check if error is retryable (busy/overloaded service)
+      const isRetryable = error.isRetryable || 
+                         error.message.includes('overloaded') || 
+                         error.message.includes('busy') || 
+                         error.message.includes('rate limit') ||
+                         error.status === 429 || 
+                         error.status === 503
+      
+      // Only log error details for non-retryable errors or final retry
+      if (!isRetryable || retries >= 3) {
+        console.error("AI generation error:", error)
+      }
+      
+      // Handle retryable errors with retry logic
+      if (isRetryable && retries < 3) {
+        const waitTime = Math.min(2000 + (retries * 2000), 10000) // 2s, 4s, 6s max
+        
+        // Only show toast for first retry to avoid spam
+        if (retries === 0) {
+          toast({
+            title: "AI Service Busy",
+            description: `Retrying automatically... The AI service is handling high demand.`,
+          })
+        }
+        
+        // Wait before retrying with exponential backoff
+        await new Promise(resolve => setTimeout(resolve, waitTime))
+        return generateWithAI(context, data, retries + 1)
+      }
+      
+      // Determine appropriate error message for non-retryable or exhausted retries
+      let errorMessage = "Failed to generate AI suggestions. Please try again."
+      if (isRetryable) {
+        errorMessage = "AI service is currently overloaded. Please try again in a few minutes."
+      } else if (error.message.includes('Network error')) {
+        errorMessage = "Network connection issue. Please check your internet and try again."
+      } else if (error.message) {
+        errorMessage = error.message
+      }
+      
       toast({
         title: "AI Generation Failed",
-        description: error.message || "Failed to generate AI suggestions. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       })
+      return null
     } finally {
       setIsGenerating(false)
+      setIsRetrying(false)
+      setRetryCount(0)
     }
   }
 
@@ -316,15 +398,29 @@ export default function ResumeBuilder({ params }: { params: Promise<{ id: string
       return
     }
 
-    const suggestions = await generateWithAI('resume_bullet_point', {
-      company: experience.company,
-      position: experience.position,
-      duration: experience.duration
-    })
+    try {
+      const suggestions = await generateWithAI('resume_bullet_point', {
+        company: experience.company,
+        position: experience.position,
+        duration: experience.duration
+      })
 
-    if (suggestions && suggestions.suggestions && suggestions.suggestions.length > 0) {
-      // Update the experience with AI-generated bullets
-      updateExperience(experience._id, "bullets", suggestions.suggestions)
+      if (suggestions && suggestions.suggestions && suggestions.suggestions.length > 0) {
+        // Update the experience with AI-generated bullets
+        updateExperience(safeId(experience._id), "bullets", suggestions.suggestions)
+      } else if (suggestions === null) {
+        // AI generation failed, don't show additional error
+        return
+      } else {
+        toast({
+          title: "No Suggestions Generated",
+          description: "Unable to generate bullet points with the provided information.",
+          variant: "destructive",
+        })
+      }
+    } catch (error: any) {
+      console.error("Error in generateExperienceBullets:", error)
+      // Error is already handled by generateWithAI, this is just a safety net
     }
   }
 
@@ -338,15 +434,29 @@ export default function ResumeBuilder({ params }: { params: Promise<{ id: string
       return
     }
 
-    const suggestions = await generateWithAI('education_achievement', {
-      institution: education.institution,
-      degree: education.degree,
-      duration: education.duration
-    })
+    try {
+      const suggestions = await generateWithAI('education_achievement', {
+        institution: education.institution,
+        degree: education.degree,
+        duration: education.duration
+      })
 
-    if (suggestions && suggestions.suggestions && suggestions.suggestions.length > 0) {
-      // Update the education with AI-generated achievements
-      updateEducation(education._id, "achievements", suggestions.suggestions)
+      if (suggestions && suggestions.suggestions && suggestions.suggestions.length > 0) {
+        // Update the education with AI-generated achievements
+        updateEducation(education._id, "achievements", suggestions.suggestions)
+      } else if (suggestions === null) {
+        // AI generation failed, don't show additional error
+        return
+      } else {
+        toast({
+          title: "No Achievements Generated",
+          description: "Unable to generate achievements with the provided information.",
+          variant: "destructive",
+        })
+      }
+    } catch (error: any) {
+      console.error("Error in generateEducationAchievements:", error)
+      // Error is already handled by generateWithAI, this is just a safety net
     }
   }
 
@@ -360,35 +470,41 @@ export default function ResumeBuilder({ params }: { params: Promise<{ id: string
       })
       return
     }
-    let updatedCount = 0;
-    for (const experience of resume.experiences) {
-      if (experience.company && experience.position) {
-        const suggestions = await generateWithAI('resume_bullet_point', {
-          company: experience.company,
-          position: experience.position,
-          duration: experience.duration
-        })
-        if (suggestions && suggestions.suggestions && suggestions.suggestions.length > 0) {
-          updateExperience(experience._id, "bullets", suggestions.suggestions)
-          updatedCount++;
-          toast({
-            title: `Achievements Generated`,
-            description: `Generated achievements for ${experience.position} at ${experience.company}`,
+    
+    try {
+      let updatedCount = 0;
+      for (const experience of resume.experiences) {
+        if (experience.company && experience.position) {
+          const suggestions = await generateWithAI('resume_bullet_point', {
+            company: experience.company,
+            position: experience.position,
+            duration: experience.duration
           })
+          if (suggestions && suggestions.suggestions && suggestions.suggestions.length > 0) {
+            updateExperience(safeId(experience._id), "bullets", suggestions.suggestions)
+            updatedCount++;
+            toast({
+              title: `Achievements Generated`,
+              description: `Generated achievements for ${experience.position} at ${experience.company}`,
+            })
+          }
         }
       }
-    }
-    if (updatedCount === 0) {
-      toast({
-        title: "No Experiences Updated",
-        description: "Please fill in company and position for each experience.",
-        variant: "destructive",
-      })
-    } else {
-      toast({
-        title: "Key Achievements Generated",
-        description: `Updated ${updatedCount} experience${updatedCount > 1 ? 's' : ''} with AI-powered achievements.`,
-      })
+      if (updatedCount === 0) {
+        toast({
+          title: "No Experiences Updated",
+          description: "Please fill in company and position for each experience.",
+          variant: "destructive",
+        })
+      } else {
+        toast({
+          title: "Key Achievements Generated",
+          description: `Updated ${updatedCount} experience${updatedCount > 1 ? 's' : ''} with AI-powered achievements.`,
+        })
+      }
+    } catch (error: any) {
+      console.error("Error in generateAllExperienceBullets:", error)
+      // Error is already handled by generateWithAI, this is just a safety net
     }
   }
 
@@ -402,15 +518,31 @@ export default function ResumeBuilder({ params }: { params: Promise<{ id: string
       })
       return
     }
-    setGeneratingProjectId(project._id);
-    const suggestions = await generateWithAI('project_description', {
-      projectName: project.name,
-      position: resume?.experiences?.[0]?.position || "Software Engineer"
-    })
-    if (suggestions && suggestions.suggestions && suggestions.suggestions.length > 0) {
-      updateProject(project._id, "description", suggestions.suggestions[0])
+    
+    try {
+      setGeneratingProjectId(project._id);
+      const suggestions = await generateWithAI('project_description', {
+        projectName: project.name,
+        position: resume?.experiences?.[0]?.position || "Software Engineer"
+      })
+      if (suggestions && suggestions.suggestions && suggestions.suggestions.length > 0) {
+        updateProject(safeId(project._id), "description", suggestions.suggestions[0])
+      } else if (suggestions === null) {
+        // AI generation failed, don't show additional error
+        return
+      } else {
+        toast({
+          title: "No Description Generated",
+          description: "Unable to generate project description with the provided information.",
+          variant: "destructive",
+        })
+      }
+    } catch (error: any) {
+      console.error("Error in generateProjectDescription:", error)
+      // Error is already handled by generateWithAI, this is just a safety net
+    } finally {
+      setGeneratingProjectId(null);
     }
-    setGeneratingProjectId(null);
   }
 
   const generatePersonalSummary = async () => {
@@ -423,14 +555,36 @@ export default function ResumeBuilder({ params }: { params: Promise<{ id: string
       return
     }
 
-    const suggestions = await generateWithAI('about_me_description', {
-      name: `${resume.personalInfo.firstName} ${resume.personalInfo.lastName}`,
-      position: "Software Engineer" // Default position
-    })
+    try {
+      const suggestions = await generateWithAI('about_me_description', {
+        name: `${resume.personalInfo.firstName} ${resume.personalInfo.lastName}`,
+        position: "Professional" // Generic position for AI context
+      })
 
-    if (suggestions && suggestions.suggestions && suggestions.suggestions.length > 0) {
-      // Update the personal info with AI-generated summary
-      updatePersonalInfo("summary", suggestions.suggestions[0])
+      if (suggestions && suggestions.suggestions && suggestions.suggestions.length > 0) {
+        // Update the personal info with AI-generated summary
+        updatePersonalInfo("summary", suggestions.suggestions[0])
+        toast({
+          title: "Summary Generated",
+          description: "AI has generated a professional summary for you.",
+        })
+      } else if (suggestions === null) {
+        // AI generation failed, error already shown by generateWithAI
+        return
+      } else {
+        toast({
+          title: "No Summary Generated",
+          description: "Unable to generate summary with the provided information.",
+          variant: "destructive",
+        })
+      }
+    } catch (error: any) {
+      console.error("Personal summary generation error:", error)
+      toast({
+        title: "Summary Generation Failed",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      })
     }
   }
 
@@ -493,6 +647,30 @@ export default function ResumeBuilder({ params }: { params: Promise<{ id: string
               </div>
 
               <div className="flex items-center space-x-4">
+                {/* Save Status Indicator */}
+                <div className="flex items-center space-x-2">
+                  {saveStatus === "saving" && (
+                    <>
+                      <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                      <span className="text-sm text-slate-600">Saving...</span>
+                    </>
+                  )}
+                  {saveStatus === "saved" && (
+                    <>
+                      <div className="w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
+                        <Check className="w-3 h-3 text-white" />
+                      </div>
+                      <span className="text-sm text-green-600">Saved</span>
+                    </>
+                  )}
+                  {saveStatus === "unsaved" && (
+                    <>
+                      <div className="w-4 h-4 bg-orange-500 rounded-full"></div>
+                      <span className="text-sm text-orange-600">Unsaved changes</span>
+                    </>
+                  )}
+                </div>
+                
                 <Button onClick={saveResume} className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white">
                   <Save className="w-4 h-4 mr-2" />
                   Save
@@ -546,6 +724,34 @@ export default function ResumeBuilder({ params }: { params: Promise<{ id: string
                   <CardHeader>
                     <CardTitle className="text-2xl font-bold text-slate-900">Resume Editor</CardTitle>
                     <p className="text-slate-600">Editing: {resume.title}</p>
+                    
+                    {/* AI Service Info Banner */}
+                    <div className={`mt-4 p-3 border rounded-lg transition-all duration-300 ${
+                      isRetrying 
+                        ? "bg-orange-50 border-orange-200" 
+                        : "bg-blue-50 border-blue-200"
+                    }`}>
+                      <div className="flex items-center space-x-2">
+                        {isRetrying ? (
+                          <div className="w-4 h-4 border-2 border-orange-600 border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <Sparkles className="w-4 h-4 text-blue-600" />
+                        )}
+                        <span className={`text-sm font-medium ${
+                          isRetrying ? "text-orange-900" : "text-blue-900"
+                        }`}>
+                          {isRetrying ? `AI Assistant (Retrying... ${retryCount}/3)` : "AI Assistant"}
+                        </span>
+                      </div>
+                      <p className={`text-xs mt-1 ${
+                        isRetrying ? "text-orange-700" : "text-blue-700"
+                      }`}>
+                        {isRetrying 
+                          ? "AI service is busy. Automatically retrying to ensure your request is processed."
+                          : "AI suggestions help improve your resume. If busy, we'll automatically retry up to 3 times."
+                        }
+                      </p>
+                    </div>
                   </CardHeader>
                   <CardContent className="space-y-8">
                     {/* Personal Information */}
@@ -692,7 +898,7 @@ export default function ResumeBuilder({ params }: { params: Promise<{ id: string
                                       Generate Bullets
                                     </Button>
                                     <Button
-                                      onClick={() => removeExperience(experience._id)}
+                                      onClick={() => removeExperience(safeId(experience._id))}
                                       variant="ghost"
                                       size="sm"
                                       className="text-red-600 hover:text-red-700 hover:bg-red-50"
@@ -715,7 +921,7 @@ export default function ResumeBuilder({ params }: { params: Promise<{ id: string
                                     <Label>Position</Label>
                                     <Input
                                       value={experience.position || ""}
-                                      onChange={(e) => updateExperience(experience._id, "position", e.target.value)}
+                                      onChange={(e) => updateExperience(safeId(experience._id), "position", e.target.value)}
                                       placeholder="Senior Software Engineer"
                                     />
                                   </div>
@@ -723,7 +929,7 @@ export default function ResumeBuilder({ params }: { params: Promise<{ id: string
                                     <Label>Duration</Label>
                                     <Input
                                       value={experience.duration || ""}
-                                      onChange={(e) => updateExperience(experience._id, "duration", e.target.value)}
+                                      onChange={(e) => updateExperience(safeId(experience._id), "duration", e.target.value)}
                                       placeholder="Jan 2022 - Present"
                                     />
                                   </div>
@@ -739,14 +945,14 @@ export default function ResumeBuilder({ params }: { params: Promise<{ id: string
                                         onChange={(e) => {
                                           const newBullets = [...(experience.bullets || [])]
                                           newBullets[bulletIndex] = e.target.value
-                                          updateExperience(experience._id, "bullets", newBullets)
+                                          updateExperience(safeId(experience._id), "bullets", newBullets)
                                         }}
                                         placeholder="Led development of key feature..."
                                       />
                                       <Button
                                         onClick={() => {
                                           const newBullets = (experience.bullets || []).filter((_, i) => i !== bulletIndex)
-                                          updateExperience(experience._id, "bullets", newBullets)
+                                          updateExperience(safeId(experience._id), "bullets", newBullets)
                                         }}
                                         variant="ghost"
                                         size="sm"
@@ -759,7 +965,7 @@ export default function ResumeBuilder({ params }: { params: Promise<{ id: string
                                   <Button
                                     onClick={() => {
                                       const newBullets = [...(experience.bullets || []), ""]
-                                      updateExperience(experience._id, "bullets", newBullets)
+                                      updateExperience(safeId(experience._id), "bullets", newBullets)
                                     }}
                                     variant="outline"
                                     size="sm"
@@ -797,7 +1003,7 @@ export default function ResumeBuilder({ params }: { params: Promise<{ id: string
                                 <div className="flex items-start justify-between mb-4">
                                   <h4 className="font-semibold text-slate-900">Education {index + 1}</h4>
                                   <Button
-                                    onClick={() => removeEducation(education._id)}
+                                    onClick={() => removeEducation(safeId(education._id))}
                                     variant="ghost"
                                     size="sm"
                                     className="text-red-600 hover:text-red-700 hover:bg-red-50"
@@ -811,7 +1017,7 @@ export default function ResumeBuilder({ params }: { params: Promise<{ id: string
                                     <Label>Institution</Label>
                                     <Input
                                       value={education.institution || ""}
-                                      onChange={(e) => updateEducation(education._id, "institution", e.target.value)}
+                                      onChange={(e) => updateEducation(safeId(education._id), "institution", e.target.value)}
                                       placeholder="University of California"
                                     />
                                   </div>
@@ -819,7 +1025,7 @@ export default function ResumeBuilder({ params }: { params: Promise<{ id: string
                                     <Label>Degree</Label>
                                     <Input
                                       value={education.degree || ""}
-                                      onChange={(e) => updateEducation(education._id, "degree", e.target.value)}
+                                      onChange={(e) => updateEducation(safeId(education._id), "degree", e.target.value)}
                                       placeholder="Bachelor of Science in Computer Science"
                                     />
                                   </div>
@@ -827,7 +1033,7 @@ export default function ResumeBuilder({ params }: { params: Promise<{ id: string
                                     <Label>Duration</Label>
                                     <Input
                                       value={education.duration || ""}
-                                      onChange={(e) => updateEducation(education._id, "duration", e.target.value)}
+                                      onChange={(e) => updateEducation(safeId(education._id), "duration", e.target.value)}
                                       placeholder="2018 - 2022"
                                     />
                                   </div>
@@ -843,14 +1049,14 @@ export default function ResumeBuilder({ params }: { params: Promise<{ id: string
                                         onChange={(e) => {
                                           const newAchievements = [...(education.achievements || [])]
                                           newAchievements[achievementIndex] = e.target.value
-                                          updateEducation(education._id, "achievements", newAchievements)
+                                          updateEducation(safeId(education._id), "achievements", newAchievements)
                                         }}
                                         placeholder="GPA: 3.8/4.0..."
                                       />
                                       <Button
                                         onClick={() => {
                                           const newAchievements = (education.achievements || []).filter((_, i) => i !== achievementIndex)
-                                          updateEducation(education._id, "achievements", newAchievements)
+                                          updateEducation(safeId(education._id), "achievements", newAchievements)
                                         }}
                                         variant="ghost"
                                         size="sm"
@@ -863,7 +1069,7 @@ export default function ResumeBuilder({ params }: { params: Promise<{ id: string
                                   <Button
                                     onClick={() => {
                                       const newAchievements = [...(education.achievements || []), ""]
-                                      updateEducation(education._id, "achievements", newAchievements)
+                                      updateEducation(safeId(education._id), "achievements", newAchievements)
                                     }}
                                     variant="outline"
                                     size="sm"
@@ -925,7 +1131,7 @@ export default function ResumeBuilder({ params }: { params: Promise<{ id: string
                               >
                                 <span>{skill.name}</span>
                                 <button
-                                  onClick={() => removeSkill(skill._id)}
+                                  onClick={() => removeSkill(safeId(skill._id))}
                                   className="ml-2 text-red-500 hover:text-red-700"
                                 >
                                   <Trash2 className="w-3 h-3" />
@@ -958,7 +1164,7 @@ export default function ResumeBuilder({ params }: { params: Promise<{ id: string
                                 <div className="flex items-start justify-between mb-4">
                                   <h4 className="font-semibold text-slate-900">Project {index + 1}</h4>
                                   <Button
-                                    onClick={() => removeProject(project._id)}
+                                    onClick={() => removeProject(safeId(project._id))}
                                     variant="ghost"
                                     size="sm"
                                     className="text-red-600 hover:text-red-700 hover:bg-red-50"
@@ -972,7 +1178,7 @@ export default function ResumeBuilder({ params }: { params: Promise<{ id: string
                                     <Label>Project Name</Label>
                                     <Input
                                       value={project.name || ""}
-                                      onChange={(e) => updateProject(project._id, "name", e.target.value)}
+                                      onChange={(e) => updateProject(safeId(project._id), "name", e.target.value)}
                                       placeholder="E-commerce Platform"
                                     />
                                   </div>
@@ -980,7 +1186,7 @@ export default function ResumeBuilder({ params }: { params: Promise<{ id: string
                                     <Label>Project Link</Label>
                                     <Input
                                       value={project.link || ""}
-                                      onChange={(e) => updateProject(project._id, "link", e.target.value)}
+                                      onChange={(e) => updateProject(safeId(project._id), "link", e.target.value)}
                                       placeholder="https://github.com/username/project"
                                     />
                                   </div>
@@ -991,7 +1197,7 @@ export default function ResumeBuilder({ params }: { params: Promise<{ id: string
                                   <div className="flex items-center gap-2">
                                     <Textarea
                                       value={project.description || ""}
-                                      onChange={(e) => updateProject(project._id, "description", e.target.value)}
+                                      onChange={(e) => updateProject(safeId(project._id), "description", e.target.value)}
                                       placeholder="A full-stack e-commerce platform built with React and Node.js..."
                                       rows={3}
                                     />
@@ -1028,21 +1234,21 @@ export default function ResumeBuilder({ params }: { params: Promise<{ id: string
                                       Generate Tech Stack
                                     </Button>
                                   </div>
-                                  {(project.technologies || []).map((tech, techIndex) => (
+                                  {safeTechnologies(project.technologies).map((tech: string, techIndex: number) => (
                                     <div key={techIndex} className="flex items-center space-x-2">
                                       <Input
                                         value={tech || ""}
                                         onChange={(e) => {
-                                          const newTechs = [...(project.technologies || [])]
+                                          const newTechs = [...safeTechnologies(project.technologies)]
                                           newTechs[techIndex] = e.target.value
-                                          updateProject(project._id, "technologies", newTechs)
+                                          updateProject(safeId(project._id), "technologies", newTechs)
                                         }}
                                         placeholder="React, Node.js, MongoDB..."
                                       />
                                       <Button
                                         onClick={() => {
-                                          const newTechs = (project.technologies || []).filter((_, i) => i !== techIndex)
-                                          updateProject(project._id, "technologies", newTechs)
+                                          const newTechs = safeTechnologies(project.technologies).filter((_: string, i: number) => i !== techIndex)
+                                          updateProject(safeId(project._id), "technologies", newTechs)
                                         }}
                                         variant="ghost"
                                         size="sm"
@@ -1054,8 +1260,8 @@ export default function ResumeBuilder({ params }: { params: Promise<{ id: string
                                   ))}
                                   <Button
                                     onClick={() => {
-                                      const newTechs = [...(project.technologies || []), ""]
-                                      updateProject(project._id, "technologies", newTechs)
+                                      const newTechs = [...safeTechnologies(project.technologies), ""]
+                                      updateProject(safeId(project._id), "technologies", newTechs)
                                     }}
                                     variant="outline"
                                     size="sm"
@@ -1093,7 +1299,7 @@ export default function ResumeBuilder({ params }: { params: Promise<{ id: string
                                 <div className="flex items-start justify-between mb-4">
                                   <h4 className="font-semibold text-slate-900">Certification {index + 1}</h4>
                                   <Button
-                                    onClick={() => removeCertification(certification._id)}
+                                    onClick={() => removeCertification(safeId(certification._id))}
                                     variant="ghost"
                                     size="sm"
                                     className="text-red-600 hover:text-red-700 hover:bg-red-50"
@@ -1107,7 +1313,7 @@ export default function ResumeBuilder({ params }: { params: Promise<{ id: string
                                     <Label>Certification Name</Label>
                                     <Input
                                       value={certification.name}
-                                      onChange={(e) => updateCertification(certification._id, "name", e.target.value)}
+                                      onChange={(e) => updateCertification(safeId(certification._id), "name", e.target.value)}
                                       placeholder="AWS Certified Solutions Architect"
                                     />
                                   </div>
@@ -1115,7 +1321,7 @@ export default function ResumeBuilder({ params }: { params: Promise<{ id: string
                                     <Label>Issuing Organization</Label>
                                     <Input
                                       value={certification.issuer}
-                                      onChange={(e) => updateCertification(certification._id, "issuer", e.target.value)}
+                                      onChange={(e) => updateCertification(safeId(certification._id), "issuer", e.target.value)}
                                       placeholder="Amazon Web Services"
                                     />
                                   </div>
@@ -1123,7 +1329,7 @@ export default function ResumeBuilder({ params }: { params: Promise<{ id: string
                                     <Label>Date Earned</Label>
                                     <Input
                                       value={certification.date}
-                                      onChange={(e) => updateCertification(certification._id, "date", e.target.value)}
+                                      onChange={(e) => updateCertification(safeId(certification._id), "date", e.target.value)}
                                       placeholder="December 2023"
                                     />
                                   </div>
@@ -1131,7 +1337,7 @@ export default function ResumeBuilder({ params }: { params: Promise<{ id: string
                                     <Label>Verification Link</Label>
                                     <Input
                                       value={certification.link}
-                                      onChange={(e) => updateCertification(certification._id, "link", e.target.value)}
+                                      onChange={(e) => updateCertification(safeId(certification._id), "link", e.target.value)}
                                       placeholder="https://aws.amazon.com/verification"
                                     />
                                   </div>
@@ -1152,3 +1358,19 @@ export default function ResumeBuilder({ params }: { params: Promise<{ id: string
     </ProtectedRoute>
   )
 }
+
+// Helper functions for type safety
+const safeId = (id: string | undefined): string => id || "";
+
+const safeTechnologies = (technologies: string | string[]): string[] => {
+  return Array.isArray(technologies) ? technologies : [];
+};
+
+// Placeholder for missing generateSkills function
+const generateSkills = () => {
+  console.log("generateSkills function is not implemented yet.");
+};
+
+const generateProjectTechnologies = (project: any) => {
+  console.log("generateProjectTechnologies function is not implemented yet.", project);
+};
