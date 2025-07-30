@@ -26,15 +26,6 @@ export default function Home() {
   const [scrollY, setScrollY] = useState(0)
   const [isVisible, setIsVisible] = useState<{[key: string]: boolean}>({})
 
-  // Debug function to clear all authentication data
-  const clearAuthData = () => {
-    localStorage.removeItem("auth_token")
-    localStorage.removeItem("user_info")
-    localStorage.removeItem("user")
-    console.log("All authentication data cleared")
-    window.location.reload()
-  }
-
   useEffect(() => {
     // Check if user is already logged in and has valid authentication
     const authToken = localStorage.getItem("auth_token")
@@ -232,16 +223,6 @@ export default function Home() {
                   <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               </Link>
-              {/* Debug button to clear auth data */}
-              <Button 
-                onClick={clearAuthData}
-                variant="outline"
-                size="sm"
-                className="text-xs opacity-50 hover:opacity-100"
-                title="Clear authentication data (debug)"
-              >
-                Clear Auth
-              </Button>
             </div>
           </div>
         </div>
