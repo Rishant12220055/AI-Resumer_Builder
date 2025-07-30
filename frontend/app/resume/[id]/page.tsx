@@ -1,3 +1,8 @@
+// Placeholder for Next.js static export requirement
+export async function generateStaticParams() {
+  // TODO: Replace with real IDs from your data source
+  return [{ id: 'example-id-1' }, { id: 'example-id-2' }];
+}
 "use client"
 
 import { useState, useEffect } from "react"
