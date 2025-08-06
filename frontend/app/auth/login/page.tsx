@@ -51,19 +51,15 @@ export default function LoginPage() {
   const handleSocialLogin = async (provider: string) => {
     setIsLoading(true)
     try {
-      // For now, we'll simulate social login
-      // In a real implementation, you'd redirect to the OAuth provider
-      toast({
-        title: "Coming Soon",
-        description: `${provider} login will be available soon!`,
-      })
+      const backendUrl = "https://ai-resumer-builder-backend.vercel.app"
+      // Redirect to OAuth provider
+      window.location.href = `${backendUrl}/api/auth/${provider}`
     } catch (error: any) {
       toast({
         title: "Error",
         description: "Social login failed. Please try again.",
         variant: "destructive",
       })
-    } finally {
       setIsLoading(false)
     }
   }

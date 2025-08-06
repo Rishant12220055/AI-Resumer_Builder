@@ -9,6 +9,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   signup: (firstName: string, lastName: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  setOAuthUser: (user: User, token: string) => void;
   isAuthenticated: boolean;
 }
 
@@ -92,12 +93,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const setOAuthUser = (user: User, token: string) => {
+    // Set the token in API
+    api.setToken(token);
+    // Set user state
+    setUser(user);
+    // Store user info in localStorage
+    localStorage.setItem('user_info', JSON.stringify(user));
+  };
+
   const value: AuthContextType = {
     user,
     loading,
     login,
     signup,
     logout,
+    setOAuthUser,
     isAuthenticated: !!user,
   };
 

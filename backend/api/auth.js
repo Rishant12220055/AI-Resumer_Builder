@@ -99,6 +99,40 @@ router.post('/login', async (req, res) => {
   }
 });
 
+// GET /api/auth/google - Direct redirect to Google OAuth
+router.get('/google', (req, res) => {
+  if (!GOOGLE_CLIENT_ID) {
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    return res.redirect(`${frontendUrl}/auth/login?error=Google OAuth not configured`);
+  }
+  
+  const redirectUri = `${req.protocol}://${req.get('host')}/api/auth/google/callback`;
+  const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
+    `client_id=${GOOGLE_CLIENT_ID}&` +
+    `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+    `response_type=code&` +
+    `scope=openid email profile&` +
+    `access_type=offline`;
+  
+  res.redirect(googleAuthUrl);
+});
+
+// GET /api/auth/github - Direct redirect to GitHub OAuth
+router.get('/github', (req, res) => {
+  if (!GITHUB_CLIENT_ID) {
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    return res.redirect(`${frontendUrl}/auth/login?error=GitHub OAuth not configured`);
+  }
+  
+  const redirectUri = `${req.protocol}://${req.get('host')}/api/auth/github/callback`;
+  const githubAuthUrl = `https://github.com/login/oauth/authorize?` +
+    `client_id=${GITHUB_CLIENT_ID}&` +
+    `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+    `scope=user:email`;
+  
+  res.redirect(githubAuthUrl);
+});
+
 // GET /api/auth/google/url
 router.get('/google/url', (req, res) => {
   if (!GOOGLE_CLIENT_ID) {
@@ -122,15 +156,18 @@ router.get('/google/callback', async (req, res) => {
     const { code, error } = req.query;
     
     if (error) {
-      return res.redirect(`/auth/login?error=Google authentication failed`);
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      return res.redirect(`${frontendUrl}/auth/login?error=Google authentication failed`);
     }
     
     if (!code) {
-      return res.redirect(`/auth/login?error=No authorization code received`);
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      return res.redirect(`${frontendUrl}/auth/login?error=No authorization code received`);
     }
     
     if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
-      return res.redirect(`/auth/login?error=Google OAuth not configured`);
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      return res.redirect(`${frontendUrl}/auth/login?error=Google OAuth not configured`);
     }
     
     const redirectUri = `${req.protocol}://${req.get('host')}/api/auth/google/callback`;
@@ -177,7 +214,8 @@ router.get('/google/callback', async (req, res) => {
     );
     
     // Redirect to frontend with token
-    res.redirect(`/auth/callback/google?token=${token}&user=${encodeURIComponent(JSON.stringify({
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    res.redirect(`${frontendUrl}/auth/callback?token=${token}&user=${encodeURIComponent(JSON.stringify({
       id: user._id.toString(),
       name: user.name,
       email: user.email,
@@ -186,7 +224,8 @@ router.get('/google/callback', async (req, res) => {
     
   } catch (error) {
     console.error('Google OAuth error:', error);
-    res.redirect(`/auth/login?error=Google authentication failed`);
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    res.redirect(`${frontendUrl}/auth/login?error=Google authentication failed`);
   }
 });
 
@@ -211,15 +250,18 @@ router.get('/github/callback', async (req, res) => {
     const { code, error } = req.query;
     
     if (error) {
-      return res.redirect(`/auth/login?error=GitHub authentication failed`);
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      return res.redirect(`${frontendUrl}/auth/login?error=GitHub authentication failed`);
     }
     
     if (!code) {
-      return res.redirect(`/auth/login?error=No authorization code received`);
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      return res.redirect(`${frontendUrl}/auth/login?error=No authorization code received`);
     }
     
     if (!GITHUB_CLIENT_ID || !GITHUB_CLIENT_SECRET) {
-      return res.redirect(`/auth/login?error=GitHub OAuth not configured`);
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      return res.redirect(`${frontendUrl}/auth/login?error=GitHub OAuth not configured`);
     }
     
     const redirectUri = `${req.protocol}://${req.get('host')}/api/auth/github/callback`;
@@ -237,7 +279,8 @@ router.get('/github/callback', async (req, res) => {
     const { access_token } = tokenResponse.data;
     
     if (!access_token) {
-      return res.redirect(`/auth/login?error=Failed to get access token`);
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      return res.redirect(`${frontendUrl}/auth/login?error=Failed to get access token`);
     }
     
     // Get user info from GitHub
@@ -281,7 +324,8 @@ router.get('/github/callback', async (req, res) => {
     );
     
     // Redirect to frontend with token
-    res.redirect(`/auth/callback/github?token=${token}&user=${encodeURIComponent(JSON.stringify({
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    res.redirect(`${frontendUrl}/auth/callback?token=${token}&user=${encodeURIComponent(JSON.stringify({
       id: user._id.toString(),
       name: user.name,
       email: user.email,
@@ -290,7 +334,8 @@ router.get('/github/callback', async (req, res) => {
     
   } catch (error) {
     console.error('GitHub OAuth error:', error);
-    res.redirect(`/auth/login?error=GitHub authentication failed`);
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    res.redirect(`${frontendUrl}/auth/login?error=GitHub authentication failed`);
   }
 });
 
