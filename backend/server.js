@@ -12,11 +12,25 @@ app.use(helmet());
 
 // CORS configuration
 const corsOptions = {
-  origin: process.env.ALLOWED_ORIGINS 
-    ? process.env.ALLOWED_ORIGINS.split(',')
-    : ['http://localhost:3000', 'http://localhost:3001'],
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    const allowedOrigins = process.env.ALLOWED_ORIGINS 
+      ? process.env.ALLOWED_ORIGINS.split(',')
+      : ['http://localhost:3000', 'http://localhost:3001', 'https://ai-resumer-builder.vercel.app'];
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.log('CORS blocked origin:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
-  optionsSuccessStatus: 200
+  optionsSuccessStatus: 200,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-requested-with']
 };
 app.use(cors(corsOptions));
 
@@ -63,6 +77,16 @@ app.get('/mongo-health', async (req, res) => {
       timestamp: new Date().toISOString()
     });
   }
+});
+
+// CORS test endpoint
+app.get('/cors-test', (req, res) => {
+  res.status(200).json({
+    status: 'CORS OK',
+    origin: req.headers.origin,
+    timestamp: new Date().toISOString(),
+    message: 'CORS is working correctly'
+  });
 });
 
 // Import routes

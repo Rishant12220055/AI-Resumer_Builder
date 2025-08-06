@@ -305,5 +305,17 @@ router.post('/logout', (req, res) => {
   res.status(200).json({ message: 'Logged out successfully' });
 });
 
+// GET /api/auth/test - Test endpoint for CORS and connectivity
+router.get('/test', (req, res) => {
+  res.status(200).json({
+    status: 'API Working',
+    endpoint: '/api/auth/test',
+    timestamp: new Date().toISOString(),
+    origin: req.headers.origin,
+    userAgent: req.headers['user-agent'],
+    message: 'Auth API is accessible'
+  });
+});
+
 module.exports = router;
 module.exports.authenticateJWT = authenticateJWT; 
