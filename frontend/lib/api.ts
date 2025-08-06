@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = 'https://ai-resumer-builder-backend.vercel.app/api';
 
 // Types
 export interface User {
