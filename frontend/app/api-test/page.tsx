@@ -2,15 +2,26 @@
 
 import React, { useState, useEffect } from 'react';
 
+interface TestResult {
+  success: boolean;
+  data?: any;
+  status?: number;
+  error?: string;
+}
+
+interface TestResults {
+  [key: string]: TestResult;
+}
+
 const ApiTestPage = () => {
-  const [testResults, setTestResults] = useState({});
+  const [testResults, setTestResults] = useState<TestResults>({});
   const [loading, setLoading] = useState(false);
 
   const API_BASE_URL = 'https://ai-resumer-builder-backend.vercel.app/api';
 
   const runTests = async () => {
     setLoading(true);
-    const results = {};
+    const results: TestResults = {};
 
     // Test 1: Basic Health Check
     try {
@@ -18,7 +29,7 @@ const ApiTestPage = () => {
       const data = await response.json();
       results.healthCheck = { success: true, data, status: response.status };
     } catch (error) {
-      results.healthCheck = { success: false, error: error.message };
+      results.healthCheck = { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
 
     // Test 2: MongoDB Health Check
@@ -27,7 +38,7 @@ const ApiTestPage = () => {
       const data = await response.json();
       results.mongoHealth = { success: true, data, status: response.status };
     } catch (error) {
-      results.mongoHealth = { success: false, error: error.message };
+      results.mongoHealth = { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
 
     // Test 3: CORS Test
@@ -36,7 +47,7 @@ const ApiTestPage = () => {
       const data = await response.json();
       results.corsTest = { success: true, data, status: response.status };
     } catch (error) {
-      results.corsTest = { success: false, error: error.message };
+      results.corsTest = { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
 
     // Test 4: Auth API Test
@@ -45,7 +56,7 @@ const ApiTestPage = () => {
       const data = await response.json();
       results.authTest = { success: true, data, status: response.status };
     } catch (error) {
-      results.authTest = { success: false, error: error.message };
+      results.authTest = { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
 
     // Test 5: Auth POST Test (should fail but show CORS working)
@@ -60,7 +71,7 @@ const ApiTestPage = () => {
       const data = await response.json();
       results.authPostTest = { success: true, data, status: response.status };
     } catch (error) {
-      results.authPostTest = { success: false, error: error.message };
+      results.authPostTest = { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
 
     setTestResults(results);
@@ -71,7 +82,7 @@ const ApiTestPage = () => {
     runTests();
   }, []);
 
-  const renderResult = (key, result) => (
+  const renderResult = (key: string, result: TestResult) => (
     <div key={key} className="mb-4 p-4 border rounded">
       <h3 className="font-bold text-lg mb-2">{key}</h3>
       <div className={`p-2 rounded ${result.success ? 'bg-green-100' : 'bg-red-100'}`}>
