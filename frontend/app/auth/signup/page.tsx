@@ -29,6 +29,7 @@ export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -37,39 +38,55 @@ export default function SignupPage() {
     confirmPassword: "",
     agreeToTerms: false,
   })
+  // Import hooks and router
+  const { useRouter } = require("next/navigation");
+  const router = useRouter();
+  const { signup } = require("@/lib/auth-context").useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
+    setError(null);
     if (formData.password !== formData.confirmPassword) {
-      alert("Passwords don't match!")
-      return
+      setError("Passwords don't match!");
+      return;
     }
     if (!formData.agreeToTerms) {
-      alert("Please agree to the terms and conditions")
-      return
+      setError("Please agree to the terms and conditions");
+      return;
     }
-
-    setIsLoading(true)
-
-    // Simulate API call
-    setTimeout(() => {
-      setIsLoading(false)
-      // Redirect to dashboard
-      window.location.href = "/dashboard"
-    }, 2000)
+    setIsLoading(true);
+    try {
+      await signup(
+        formData.firstName,
+        formData.lastName,
+        formData.email,
+        formData.password
+      );
+      setIsLoading(false);
+      router.push("/dashboard");
+    } catch (err: any) {
+      setIsLoading(false);
+      setError(err?.message || "Signup failed. Please try again.");
+    }
   }
 
   const handleSocialSignup = (provider: string) => {
-    setIsLoading(true)
-    // Simulate social signup
+    setIsLoading(true);
+    setError(null);
+    // TODO: Implement real social signup logic here
     setTimeout(() => {
-      setIsLoading(false)
-      window.location.href = "/dashboard"
-    }, 1500)
+      setIsLoading(false);
+      router.push("/dashboard");
+    }, 1500);
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/50 flex items-center justify-center p-4">
+      {error && (
+        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-red-100 text-red-700 px-4 py-2 rounded shadow z-50">
+          {error}
+        </div>
+      )}
       {/* Background Elements */}
       <div className="absolute top-20 left-10 w-80 h-80 bg-blue-200 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob" />
       <div className="absolute top-40 right-10 w-80 h-80 bg-indigo-200 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-2000" />

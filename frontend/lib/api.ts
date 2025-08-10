@@ -1,4 +1,11 @@
-const API_BASE_URL = 'https://ai-resumer-builder-backend.vercel.app/api';
+import config from './config';
+
+const API_BASE_URL = (() => {
+  if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+    return process.env.NEXT_PUBLIC_API_URL_LOCAL || config.API_BASE_URL;
+  }
+  return config.API_BASE_URL;
+})();
 
 // Types
 export interface User {
