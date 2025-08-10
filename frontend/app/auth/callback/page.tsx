@@ -1,12 +1,12 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import { Loader2 } from "lucide-react"
 
-export default function CallbackPage() {
+function CallbackPageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { setOAuthUser } = useAuth()
@@ -26,15 +26,12 @@ export default function CallbackPage() {
         if (token && user) {
           // Parse user data
           const userData = JSON.parse(decodeURIComponent(user))
-          
           // Set authentication using OAuth method
           setOAuthUser(userData, token)
-
           toast({
             title: "Success!",
             description: "You have been logged in successfully.",
           })
-
           // Redirect to dashboard
           router.push("/dashboard")
         } else {
@@ -50,7 +47,6 @@ export default function CallbackPage() {
         router.push("/auth/login")
       }
     }
-
     handleCallback()
   }, [searchParams, router, setOAuthUser, toast])
 
@@ -62,5 +58,13 @@ export default function CallbackPage() {
         <p className="text-slate-500">Please wait while we log you in.</p>
       </div>
     </div>
+  )
+}
+
+export default function CallbackPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <CallbackPageInner />
+    </Suspense>
   )
 }

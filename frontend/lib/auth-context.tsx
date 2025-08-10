@@ -10,6 +10,7 @@ interface AuthContextType {
   signup: (firstName: string, lastName: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
+  setOAuthUser: (user: User, token: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -92,6 +93,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // Set OAuth user and token
+  const setOAuthUser = (user: User, token: string) => {
+    setUser(user);
+    localStorage.setItem('user_info', JSON.stringify(user));
+    if (api.setToken) {
+      api.setToken(token);
+    } else {
+      localStorage.setItem('auth_token', token);
+    }
+  };
+
   const value: AuthContextType = {
     user,
     loading,
@@ -99,6 +111,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signup,
     logout,
     isAuthenticated: !!user,
+    setOAuthUser,
   };
 
   return (
@@ -114,4 +127,4 @@ export function useAuth() {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
-} 
+}
