@@ -33,6 +33,12 @@ function authenticateJWT(req, res, next) {
   });
 }
 
+// Disable caching for all auth routes
+router.use((req, res, next) => {
+  res.set('Cache-Control', 'no-store');
+  next();
+});
+
 // POST /api/auth/signup
 router.post('/signup', async (req, res) => {
   try {
@@ -318,4 +324,4 @@ router.get('/test', (req, res) => {
 });
 
 module.exports = router;
-module.exports.authenticateJWT = authenticateJWT; 
+module.exports.authenticateJWT = authenticateJWT;
