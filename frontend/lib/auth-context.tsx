@@ -69,10 +69,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signup = async (firstName: string, lastName: string, email: string, password: string) => {
     try {
+      console.log('Auth context: Starting signup process...');
       const response = await api.signup({ firstName, lastName, email, password });
+      console.log('Auth context: Signup API response:', response);
       setUser(response.user);
       // Store user info in localStorage
       localStorage.setItem('user_info', JSON.stringify(response.user));
+      console.log('Auth context: User set and stored in localStorage:', response.user);
     } catch (error) {
       console.error('Signup failed:', error);
       throw error;

@@ -3,6 +3,7 @@
 import type React from "react"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
@@ -10,6 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
+import { useAuth } from "@/lib/auth-context"
 import {
   Rocket,
   Mail,
@@ -38,10 +40,8 @@ export default function SignupPage() {
     confirmPassword: "",
     agreeToTerms: false,
   })
-  // Import hooks and router
-  const { useRouter } = require("next/navigation");
-  const router = useRouter();
-  const { signup } = require("@/lib/auth-context").useAuth();
+  const router = useRouter()
+  const { signup } = useAuth()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,15 +56,21 @@ export default function SignupPage() {
     }
     setIsLoading(true);
     try {
+      console.log('Attempting signup with:', { firstName: formData.firstName, lastName: formData.lastName, email: formData.email });
       await signup(
         formData.firstName,
         formData.lastName,
         formData.email,
         formData.password
       );
-      setIsLoading(false);
-      router.push("/dashboard");
+      console.log('Signup successful, redirecting to dashboard...');
+      // Give a small delay for state to update
+      setTimeout(() => {
+        setIsLoading(false);
+        router.push("/dashboard");
+      }, 100);
     } catch (err: any) {
+      console.error('Signup error:', err);
       setIsLoading(false);
       setError(err?.message || "Signup failed. Please try again.");
     }
