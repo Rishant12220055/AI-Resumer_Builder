@@ -44,7 +44,7 @@ export default function SignupPage() {
   const { signup } = useAuth()
 
   const handleSubmit = async (e: React.FormEvent) => {
-    console.log('Form submitted!', formData);
+    console.log('🚀 FORM SUBMITTED - DEBUG MODE ACTIVE!', formData);
     e.preventDefault();
     setError(null);
     
