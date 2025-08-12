@@ -152,9 +152,16 @@ class ApiClient {
 
   // Authentication methods
   setToken(token: string) {
+    console.log('API: Setting token:', token ? 'TOKEN_PRESENT' : 'TOKEN_EMPTY');
     this.token = token;
     if (typeof window !== 'undefined') {
       localStorage.setItem('auth_token', token);
+      console.log('API: Token stored in localStorage');
+      // Verify it was stored
+      const retrieved = localStorage.getItem('auth_token');
+      console.log('API: Token retrieval verification:', retrieved ? 'SUCCESS' : 'FAILED');
+    } else {
+      console.log('API: Window undefined, cannot store token in localStorage');
     }
   }
 
@@ -184,11 +191,16 @@ class ApiClient {
     email: string;
     password: string;
   }): Promise<AuthResponse> {
+    console.log('API: Sending signup request with data:', { ...data, password: '[HIDDEN]' });
     const response = await this.request<AuthResponse>('/auth/signup', {
       method: 'POST',
       body: JSON.stringify(data),
     });
+    console.log('API: Signup response received:', { user: response.user, token: response.token ? 'TOKEN_PRESENT' : 'TOKEN_MISSING' });
     this.setToken(response.token);
+    console.log('API: Token set, verifying storage...');
+    const storedToken = this.getToken();
+    console.log('API: Token verification - stored successfully:', storedToken ? 'Yes' : 'No');
     return response;
   }
 

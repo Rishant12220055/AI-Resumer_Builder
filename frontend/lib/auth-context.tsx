@@ -72,10 +72,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('Auth context: Starting signup process...');
       const response = await api.signup({ firstName, lastName, email, password });
       console.log('Auth context: Signup API response:', response);
+      console.log('Auth context: Token from response:', response.token);
+      
       setUser(response.user);
       // Store user info in localStorage
       localStorage.setItem('user_info', JSON.stringify(response.user));
       console.log('Auth context: User set and stored in localStorage:', response.user);
+      
+      // Verify token was stored
+      const storedToken = api.getToken();
+      console.log('Auth context: Token stored successfully:', storedToken ? 'Yes' : 'No');
+      console.log('Auth context: Stored token value:', storedToken);
     } catch (error) {
       console.error('Signup failed:', error);
       throw error;
