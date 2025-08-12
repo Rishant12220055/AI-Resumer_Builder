@@ -121,7 +121,7 @@ export default function SignupPage() {
         <Card className="border-0 shadow-2xl shadow-blue-500/10 bg-white/80 backdrop-blur-xl animate-fade-in-up animation-delay-200">
           <CardHeader className="text-center pb-6">
             <div className="space-y-2">
-              <h1 className="text-3xl font-bold text-slate-900">Create Your Account</h1>
+              <h1 className="text-3xl font-bold text-slate-900">Create Your Account [DEBUG v2]</h1>
               <p className="text-slate-600 font-medium">Join 50,000+ professionals building amazing resumes</p>
             </div>
           </CardHeader>
