@@ -44,16 +44,23 @@ export default function SignupPage() {
   const { signup } = useAuth()
 
   const handleSubmit = async (e: React.FormEvent) => {
+    console.log('Form submitted!', formData);
     e.preventDefault();
     setError(null);
+    
+    // Validation checks with logging
     if (formData.password !== formData.confirmPassword) {
+      console.log('Validation failed: Passwords do not match');
       setError("Passwords don't match!");
       return;
     }
     if (!formData.agreeToTerms) {
+      console.log('Validation failed: Terms not agreed');
       setError("Please agree to the terms and conditions");
       return;
     }
+    
+    console.log('All validations passed, proceeding with signup...');
     setIsLoading(true);
     try {
       console.log('Attempting signup with:', { firstName: formData.firstName, lastName: formData.lastName, email: formData.email });
