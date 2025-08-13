@@ -141,7 +141,9 @@ router.get('/google/callback', async (req, res) => {
       return res.redirect(`/auth/login?error=Google OAuth not configured`);
     }
     
-    const redirectUri = `${req.protocol}://${req.get('host')}/api/auth/google/callback`;
+    // Force HTTPS in production, use req.protocol for local development
+    const protocol = process.env.NODE_ENV === 'production' ? 'https' : req.protocol;
+    const redirectUri = `${protocol}://${req.get('host')}/api/auth/google/callback`;
     
     // Exchange code for access token
     const tokenResponse = await axios.post('https://oauth2.googleapis.com/token', {
