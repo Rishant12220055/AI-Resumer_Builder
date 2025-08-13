@@ -111,7 +111,9 @@ router.get('/google/url', (req, res) => {
     return res.status(500).json({ error: 'Google OAuth not configured' });
   }
   
-  const redirectUri = `${req.protocol}://${req.get('host')}/api/auth/google/callback`;
+  // Force HTTPS in production, use req.protocol for local development
+  const protocol = process.env.NODE_ENV === 'production' ? 'https' : req.protocol;
+  const redirectUri = `${protocol}://${req.get('host')}/api/auth/google/callback`;
   const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
     `client_id=${GOOGLE_CLIENT_ID}&` +
     `redirect_uri=${encodeURIComponent(redirectUri)}&` +
@@ -202,7 +204,9 @@ router.get('/github/url', (req, res) => {
     return res.status(500).json({ error: 'GitHub OAuth not configured' });
   }
   
-  const redirectUri = `${req.protocol}://${req.get('host')}/api/auth/github/callback`;
+  // Force HTTPS in production, use req.protocol for local development
+  const protocol = process.env.NODE_ENV === 'production' ? 'https' : req.protocol;
+  const redirectUri = `${protocol}://${req.get('host')}/api/auth/github/callback`;
   const githubAuthUrl = `https://github.com/login/oauth/authorize?` +
     `client_id=${GITHUB_CLIENT_ID}&` +
     `redirect_uri=${encodeURIComponent(redirectUri)}&` +
@@ -228,7 +232,9 @@ router.get('/github/callback', async (req, res) => {
       return res.redirect(`/auth/login?error=GitHub OAuth not configured`);
     }
     
-    const redirectUri = `${req.protocol}://${req.get('host')}/api/auth/github/callback`;
+    // Force HTTPS in production, use req.protocol for local development
+    const protocol = process.env.NODE_ENV === 'production' ? 'https' : req.protocol;
+    const redirectUri = `${protocol}://${req.get('host')}/api/auth/github/callback`;
     
     // Exchange code for access token
     const tokenResponse = await axios.post('https://github.com/login/oauth/access_token', {
