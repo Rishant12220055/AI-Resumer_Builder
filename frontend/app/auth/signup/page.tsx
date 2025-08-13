@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/lib/auth-context"
+import config from "@/lib/config"
 import {
   Rocket,
   Mail,
@@ -83,14 +84,39 @@ export default function SignupPage() {
     }
   }
 
-  const handleSocialSignup = (provider: string) => {
+  const handleSocialSignup = async (provider: string) => {
     setIsLoading(true);
     setError(null);
-    // TODO: Implement real social signup logic here
-    setTimeout(() => {
+    
+    try {
+      console.log(`Initiating ${provider} OAuth...`);
+      
+      if (provider === 'google') {
+        const response = await fetch(`${config.API_BASE_URL}/auth/google/url`);
+        const data = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to get Google auth URL');
+        }
+        
+        // Redirect to Google OAuth
+        window.location.href = data.url;
+      } else if (provider === 'github') {
+        const response = await fetch(`${config.API_BASE_URL}/auth/github/url`);
+        const data = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to get GitHub auth URL');
+        }
+        
+        // Redirect to GitHub OAuth
+        window.location.href = data.url;
+      }
+    } catch (error: any) {
+      console.error(`${provider} OAuth error:`, error);
+      setError(error.message || `${provider} authentication failed`);
       setIsLoading(false);
-      router.push("/dashboard");
-    }, 1500);
+    }
   }
 
   return (
