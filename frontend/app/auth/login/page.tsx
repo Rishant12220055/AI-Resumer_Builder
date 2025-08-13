@@ -52,10 +52,13 @@ export default function LoginPage() {
   const handleSocialLogin = async (provider: string) => {
     setIsLoading(true)
     try {
-      console.log(`Initiating ${provider} OAuth...`);
+      console.log(`🚀 Initiating ${provider} OAuth...`);
+      console.log('🔧 Using API URL:', config.API_BASE_URL);
       
       if (provider === 'google') {
-        const response = await fetch(`${config.API_BASE_URL}/auth/google/url`);
+        const url = `${config.API_BASE_URL}/auth/google/url`;
+        console.log('🌐 Full URL:', url);
+        const response = await fetch(url);
         const data = await response.json();
         
         if (!response.ok) {
