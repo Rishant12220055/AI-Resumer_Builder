@@ -189,7 +189,7 @@ router.get('/google/callback', async (req, res) => {
     );
     
     // Redirect to frontend with token
-    res.redirect(`/auth/callback/google?token=${token}&user=${encodeURIComponent(JSON.stringify({
+    res.redirect(`/auth/callback?token=${token}&user=${encodeURIComponent(JSON.stringify({
       id: user._id.toString(),
       name: user.name,
       email: user.email,
@@ -198,6 +198,7 @@ router.get('/google/callback', async (req, res) => {
     
   } catch (error) {
     console.error('Google OAuth error:', error);
+    res.redirect(`/auth/login?error=Google authentication failed`);
     res.redirect(`/auth/login?error=Google authentication failed`);
   }
 });
@@ -299,7 +300,7 @@ router.get('/github/callback', async (req, res) => {
     );
     
     // Redirect to frontend with token
-    res.redirect(`/auth/callback/github?token=${token}&user=${encodeURIComponent(JSON.stringify({
+    res.redirect(`/auth/callback?token=${token}&user=${encodeURIComponent(JSON.stringify({
       id: user._id.toString(),
       name: user.name,
       email: user.email,
