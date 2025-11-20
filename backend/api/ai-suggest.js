@@ -2,10 +2,43 @@ const express = require('express');
 const router = express.Router();
 const axios = require('axios');
 
+// Simple in-memory rate limiter
+const rateLimitMap = new Map();
+const RATE_LIMIT_WINDOW = 60000; // 1 minute
+const MAX_REQUESTS_PER_WINDOW = 15; // 15 requests per minute per user
+
+function checkRateLimit(identifier) {
+  const now = Date.now();
+  const userRequests = rateLimitMap.get(identifier) || [];
+  
+  // Remove old requests outside the window
+  const recentRequests = userRequests.filter(time => now - time < RATE_LIMIT_WINDOW);
+  
+  if (recentRequests.length >= MAX_REQUESTS_PER_WINDOW) {
+    return { allowed: false, remaining: 0, resetIn: RATE_LIMIT_WINDOW / 1000 };
+  }
+  
+  recentRequests.push(now);
+  rateLimitMap.set(identifier, recentRequests);
+  return { allowed: true, remaining: MAX_REQUESTS_PER_WINDOW - recentRequests.length, resetIn: 0 };
+}
+
 // POST /api/ai-suggest
 router.post('/', async (req, res) => {
   try {
     const { company, position, duration, context, institution, degree, industry, projectName, name } = req.body;
+    
+    // Check rate limit (use IP or user identifier)
+    const identifier = req.user?.id || req.ip || 'anonymous';
+    const rateLimit = checkRateLimit(identifier);
+    
+    if (!rateLimit.allowed) {
+      console.log(`⚠️ Rate limit exceeded for ${identifier}`);
+      return res.status(429).json({ 
+        error: `Too many AI requests. Please wait ${rateLimit.resetIn} seconds before trying again.`,
+        retryAfter: rateLimit.resetIn
+      });
+    }
     
     // Debug logging
     console.log('AI Request received:', {
@@ -17,7 +50,8 @@ router.post('/', async (req, res) => {
       degree,
       industry,
       projectName,
-      name
+      name,
+      remaining: rateLimit.remaining
     });
 
     // Validate required fields based on context
@@ -197,37 +231,14 @@ Format: Return only the 3 bullet points, one per line, without numbering or extr
     }
 
     // Call Gemini API
-    console.log('Making API call to Gemini API');
-    console.log('Request payload:', {
-      contents: [
-        {
-          parts: [
-            {
-              text: 'You are a professional resume writer. Generate concise, impactful bullet points for resumes.'
-            },
-            {
-              text: prompt
-            }
-          ]
-        }
-      ],
-      generationConfig: {
-        temperature: 0.7,
-        topK: 40,
-        topP: 0.9,
-        maxOutputTokens: 300
-      }
-    });
+    console.log('Making API call to Gemini API (gemini-2.0-flash)');
 
     const response = await axios.post(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`,
       {
         contents: [
           {
             parts: [
-              {
-                text: 'You are a professional resume writer. Generate concise, impactful bullet points for resumes.'
-              },
               {
                 text: prompt
               }
@@ -238,7 +249,7 @@ Format: Return only the 3 bullet points, one per line, without numbering or extr
           temperature: 0.7,
           topK: 40,
           topP: 0.9,
-          maxOutputTokens: 300
+          maxOutputTokens: 500
         }
       },
       {
@@ -251,6 +262,15 @@ Format: Return only the 3 bullet points, one per line, without numbering or extr
 
     console.log('Gemini API response status:', response.status);
     console.log('Gemini API response data:', response.data);
+
+    // Check if we got a valid response
+    if (!response.data.candidates || response.data.candidates.length === 0) {
+      console.error('No candidates in Gemini response');
+      return res.status(500).json({ 
+        error: 'AI generated no response. Please try again.',
+        suggestions: []
+      });
+    }
 
     // Extract and clean the generated text
     let generatedText = response.data.candidates[0].content.parts[0].text.trim();
@@ -377,7 +397,8 @@ Format: Return only the 3 bullet points, one per line, without numbering or extr
         });
       } else if (status === 429) {
         return res.status(429).json({ 
-          error: 'Rate limit exceeded. Please try again later.' 
+          error: 'Gemini API rate limit exceeded. Please wait a few moments and try again.',
+          retryAfter: 60
         });
       } else if (status === 400) {
         return res.status(400).json({ 

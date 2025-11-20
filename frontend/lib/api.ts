@@ -1,4 +1,11 @@
-const API_BASE_URL = 'https://ai-resumer-builder-backend.vercel.app/api';
+import config from './config';
+
+const API_BASE_URL = (() => {
+  if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+    return process.env.NEXT_PUBLIC_API_URL_LOCAL || config.API_BASE_URL;
+  }
+  return config.API_BASE_URL;
+})();
 
 // Types
 export interface User {
@@ -133,6 +140,13 @@ class ApiClient {
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+        
+        // Handle specific error codes
+        if (response.status === 429) {
+          const retryAfter = errorData.retryAfter || 60;
+          throw new Error(`Too many requests. Please wait ${retryAfter} seconds and try again.`);
+        }
+        
         throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
       }
 
@@ -145,9 +159,16 @@ class ApiClient {
 
   // Authentication methods
   setToken(token: string) {
+    console.log('API: Setting token:', token ? 'TOKEN_PRESENT' : 'TOKEN_EMPTY');
     this.token = token;
     if (typeof window !== 'undefined') {
       localStorage.setItem('auth_token', token);
+      console.log('API: Token stored in localStorage');
+      // Verify it was stored
+      const retrieved = localStorage.getItem('auth_token');
+      console.log('API: Token retrieval verification:', retrieved ? 'SUCCESS' : 'FAILED');
+    } else {
+      console.log('API: Window undefined, cannot store token in localStorage');
     }
   }
 
@@ -177,11 +198,16 @@ class ApiClient {
     email: string;
     password: string;
   }): Promise<AuthResponse> {
+    console.log('API: Sending signup request with data:', { ...data, password: '[HIDDEN]' });
     const response = await this.request<AuthResponse>('/auth/signup', {
       method: 'POST',
       body: JSON.stringify(data),
     });
+    console.log('API: Signup response received:', { user: response.user, token: response.token ? 'TOKEN_PRESENT' : 'TOKEN_MISSING' });
     this.setToken(response.token);
+    console.log('API: Token set, verifying storage...');
+    const storedToken = this.getToken();
+    console.log('API: Token verification - stored successfully:', storedToken ? 'Yes' : 'No');
     return response;
   }
 

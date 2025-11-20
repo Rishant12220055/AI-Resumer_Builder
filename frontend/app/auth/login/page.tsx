@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge"
 import { Rocket, Mail, Lock, Eye, EyeOff, ArrowRight, Github, Chrome, Sparkles, CheckCircle } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { useToast } from "@/hooks/use-toast"
+import config from "@/lib/config"
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
@@ -51,16 +52,37 @@ export default function LoginPage() {
   const handleSocialLogin = async (provider: string) => {
     setIsLoading(true)
     try {
-      // For now, we'll simulate social login
-      // In a real implementation, you'd redirect to the OAuth provider
-      toast({
-        title: "Coming Soon",
-        description: `${provider} login will be available soon!`,
-      })
+      console.log(`🚀 Initiating ${provider} OAuth...`);
+      console.log('🔧 Using API URL:', config.API_BASE_URL);
+      
+      if (provider === 'google') {
+        const url = `${config.API_BASE_URL}/auth/google/url`;
+        console.log('🌐 Full URL:', url);
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to get Google auth URL');
+        }
+        
+        // Redirect to Google OAuth
+        window.location.href = data.url;
+      } else if (provider === 'github') {
+        const response = await fetch(`${config.API_BASE_URL}/auth/github/url`);
+        const data = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to get GitHub auth URL');
+        }
+        
+        // Redirect to GitHub OAuth
+        window.location.href = data.url;
+      }
     } catch (error: any) {
+      console.error(`${provider} OAuth error:`, error);
       toast({
-        title: "Error",
-        description: "Social login failed. Please try again.",
+        title: "Authentication Error",
+        description: error.message || `${provider} authentication failed`,
         variant: "destructive",
       })
     } finally {

@@ -1,0 +1,23 @@
+AI Resume Builder - Code Repository
+
+GitHub Repository (View-only):
+https://github.com/Rishant12220055/AI-Resumer_Builder
+
+Repository Access:
+- The repository is publicly accessible for viewing
+- All source code, documentation, and project files are available
+- Clone command: git clone https://github.com/Rishant12220055/AI-Resumer_Builder.git
+
+Project Structure:
+- /frontend - Next.js React application
+- /backend - Express.js API server
+- /docs - Additional documentation
+
+Live Deployment:
+- Frontend: https://ai-resumer-builder.vercel.app
+- Backend API: https://ai-resumer-builder-backend.vercel.app
+
+For any questions or access issues, please contact:
+[Your Name]
+[Your Email]
+[Your Phone Number]

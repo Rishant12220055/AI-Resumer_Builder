@@ -522,15 +522,18 @@ export default function ResumePreview({ params }: { params: Promise<{ id: string
                               )}
                             </div>
                             <p className="text-slate-700 mb-3">{project.description}</p>
-                                                         {project.technologies && (
-                               <div className="flex flex-wrap gap-1">
-                                 {project.technologies.split(',').map((tech, techIndex) => (
-                                   <Badge key={techIndex} variant="outline" className="text-xs">
-                                     {tech.trim()}
-                                   </Badge>
-                                 ))}
-                               </div>
-                             )}
+                            {project.technologies && (
+                              <div className="flex flex-wrap gap-1">
+                                {(Array.isArray(project.technologies) 
+                                  ? project.technologies 
+                                  : project.technologies.split(',')
+                                ).map((tech, techIndex) => (
+                                  <Badge key={techIndex} variant="outline" className="text-xs">
+                                    {typeof tech === 'string' ? tech.trim() : tech}
+                                  </Badge>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>

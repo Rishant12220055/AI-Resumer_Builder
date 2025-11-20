@@ -3,6 +3,7 @@
 import type React from "react"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
@@ -10,6 +11,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
+import { useAuth } from "@/lib/auth-context"
+import config from "@/lib/config"
 import {
   Rocket,
   Mail,
@@ -29,6 +32,7 @@ export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -37,39 +41,94 @@ export default function SignupPage() {
     confirmPassword: "",
     agreeToTerms: false,
   })
+  const router = useRouter()
+  const { signup } = useAuth()
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+    console.log('🚀 FORM SUBMITTED - DEBUG MODE ACTIVE!', formData);
+    e.preventDefault();
+    setError(null);
+    
+    // Validation checks with logging
     if (formData.password !== formData.confirmPassword) {
-      alert("Passwords don't match!")
-      return
+      console.log('Validation failed: Passwords do not match');
+      setError("Passwords don't match!");
+      return;
     }
     if (!formData.agreeToTerms) {
-      alert("Please agree to the terms and conditions")
-      return
+      console.log('Validation failed: Terms not agreed');
+      setError("Please agree to the terms and conditions");
+      return;
     }
-
-    setIsLoading(true)
-
-    // Simulate API call
-    setTimeout(() => {
-      setIsLoading(false)
-      // Redirect to dashboard
-      window.location.href = "/dashboard"
-    }, 2000)
+    
+    console.log('All validations passed, proceeding with signup...');
+    setIsLoading(true);
+    try {
+      console.log('Attempting signup with:', { firstName: formData.firstName, lastName: formData.lastName, email: formData.email });
+      await signup(
+        formData.firstName,
+        formData.lastName,
+        formData.email,
+        formData.password
+      );
+      console.log('Signup successful, redirecting to dashboard...');
+      // Give a small delay for state to update
+      setTimeout(() => {
+        setIsLoading(false);
+        router.push("/dashboard");
+      }, 100);
+    } catch (err: any) {
+      console.error('Signup error:', err);
+      setIsLoading(false);
+      setError(err?.message || "Signup failed. Please try again.");
+    }
   }
 
-  const handleSocialSignup = (provider: string) => {
-    setIsLoading(true)
-    // Simulate social signup
-    setTimeout(() => {
-      setIsLoading(false)
-      window.location.href = "/dashboard"
-    }, 1500)
+  const handleSocialSignup = async (provider: string) => {
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      console.log(`🚀 Initiating ${provider} OAuth...`);
+      console.log('🔧 Using API URL:', config.API_BASE_URL);
+      
+      if (provider === 'google') {
+        const url = `${config.API_BASE_URL}/auth/google/url`;
+        console.log('🌐 Full URL:', url);
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to get Google auth URL');
+        }
+        
+        // Redirect to Google OAuth
+        window.location.href = data.url;
+      } else if (provider === 'github') {
+        const response = await fetch(`${config.API_BASE_URL}/auth/github/url`);
+        const data = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to get GitHub auth URL');
+        }
+        
+        // Redirect to GitHub OAuth
+        window.location.href = data.url;
+      }
+    } catch (error: any) {
+      console.error(`${provider} OAuth error:`, error);
+      setError(error.message || `${provider} authentication failed`);
+      setIsLoading(false);
+    }
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/50 flex items-center justify-center p-4">
+      {error && (
+        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-red-100 text-red-700 px-4 py-2 rounded shadow z-50">
+          {error}
+        </div>
+      )}
       {/* Background Elements */}
       <div className="absolute top-20 left-10 w-80 h-80 bg-blue-200 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob" />
       <div className="absolute top-40 right-10 w-80 h-80 bg-indigo-200 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-2000" />

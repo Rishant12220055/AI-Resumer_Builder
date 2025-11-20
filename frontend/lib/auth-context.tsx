@@ -10,6 +10,7 @@ interface AuthContextType {
   signup: (firstName: string, lastName: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
+  setOAuthUser: (user: User, token: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -68,10 +69,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signup = async (firstName: string, lastName: string, email: string, password: string) => {
     try {
+      console.log('Auth context: Starting signup process...');
       const response = await api.signup({ firstName, lastName, email, password });
+      console.log('Auth context: Signup API response:', response);
+      console.log('Auth context: Token from response:', response.token);
+      
       setUser(response.user);
       // Store user info in localStorage
       localStorage.setItem('user_info', JSON.stringify(response.user));
+      console.log('Auth context: User set and stored in localStorage:', response.user);
+      
+      // Verify token was stored
+      const storedToken = api.getToken();
+      console.log('Auth context: Token stored successfully:', storedToken ? 'Yes' : 'No');
+      console.log('Auth context: Stored token value:', storedToken);
     } catch (error) {
       console.error('Signup failed:', error);
       throw error;
@@ -92,6 +103,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // Set OAuth user and token
+  const setOAuthUser = (user: User, token: string) => {
+    setUser(user);
+    localStorage.setItem('user_info', JSON.stringify(user));
+    if (api.setToken) {
+      api.setToken(token);
+    } else {
+      localStorage.setItem('auth_token', token);
+    }
+  };
+
   const value: AuthContextType = {
     user,
     loading,
@@ -99,6 +121,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signup,
     logout,
     isAuthenticated: !!user,
+    setOAuthUser,
   };
 
   return (
@@ -114,4 +137,4 @@ export function useAuth() {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
-} 
+}

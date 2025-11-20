@@ -44,6 +44,19 @@ class DatabaseOperations {
     return await this.users.findOne({ _id: objectId });
   }
 
+  async updateUser(id, updateData) {
+    const objectId = this.validateObjectId(id);
+    if (!objectId) return null;
+    const update = {
+      ...updateData,
+      updated_at: new Date()
+    };
+    return await this.users.updateOne(
+      { _id: objectId },
+      { $set: update }
+    );
+  }
+
   // Resume operations
   async createResume(resumeData) {
     const resume = {
