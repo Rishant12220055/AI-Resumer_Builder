@@ -96,6 +96,11 @@ router.put('/:id', authenticateJWT, async (req, res) => {
     const { id } = req.params;
     const updateData = req.body;
     
+    console.log('📝 Update Resume Request:', { id, userId, hasPersonalInfo: !!updateData.personalInfo });
+    if (updateData.personalInfo) {
+      console.log('Personal Info to update:', updateData.personalInfo);
+    }
+    
     // Validate ObjectId format
     if (!id || id.length !== 24) {
       return res.status(400).json({ error: 'Invalid resume ID format' });
@@ -125,7 +130,9 @@ router.put('/:id', authenticateJWT, async (req, res) => {
     if (updateData.personalInfo) {
       // Filter out _id field to prevent MongoDB immutable field error
       const { _id, ...personalInfoData } = updateData.personalInfo;
-      await dbOps.updatePersonalInfo(id, personalInfoData);
+      console.log('Updating personal info with:', personalInfoData);
+      const result = await dbOps.updatePersonalInfo(id, personalInfoData);
+      console.log('Personal info update result:', result);
     }
     
     // Update experiences

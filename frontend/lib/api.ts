@@ -140,6 +140,13 @@ class ApiClient {
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+        
+        // Handle specific error codes
+        if (response.status === 429) {
+          const retryAfter = errorData.retryAfter || 60;
+          throw new Error(`Too many requests. Please wait ${retryAfter} seconds and try again.`);
+        }
+        
         throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
       }
 
